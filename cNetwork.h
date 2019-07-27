@@ -24,8 +24,12 @@ const float max_sidestep_anim_rate	= 3.0f;
 // timeout and interval settings
 // Connection attempt timeout
 #define TIMEOUT_MS  1000
+// enter world timeout
+#define TIMEOUT_ENTER_GAME_MS 4000
 // Interval between ack messages sent by us
 #define ACK_INTERVAL_MS 2000
+// Interval between player location updates sent client to server
+#define LOCATION_UPDATE_INTERVAL_MS 1000
 
 //enum OptionalHeaderFlags
 //{
@@ -77,6 +81,27 @@ enum PacketFlags
     kFlow = 0x08000000  // CFlowStruct (10, kShouldPiggyBack)
 };
 
+
+enum RawMotionFlags
+{
+    // flags for RawMotionState packet 0xF61C
+    // below types are the data types that follow the 4-byte packed flags DWORD.
+    // after the flags DWORD, each value for the flags that are set must follow in
+    // the same order as below.
+    kInvalid = 0x0,
+    kCurrentHoldKey = 0x1, // uint32 - walk or run.    0: Invalid, 1: None, 2: Run
+    kCurrentStyle = 0x2,   // uint32 - current stance - MotionStance
+    kForwardCommand = 0x4, // uint32 - forward move or motion command - MotionCommand
+    kForwardHoldKey = 0x8, // uint32 - whether forward/back key being held - 0: Invalid, 1: None, 2: Run
+    kForwardSpeed = 0x10,  // single float
+    kSideStepCommand = 0x20, // uint32 - sidestep movement command - MotionCommand
+    kSideStepHoldKey = 0x40, // uint32 - indicates whether a sidestep key is being held - 0: Invalid, 1: None, 2: Run
+    kSideStepSpeed = 0x80, // single float
+    kTurnCommand = 0x100, // uint32 - always sent as 1 direction in RawMotion with negative speed for opposite direction.- MotionCommand
+    kTurnHoldKey = 0x200, // uint32 -- whether turn key is being held, or mouselook in progress
+    kTurnSpeed = 0x400 // single float -- turn movement speed
+};
+
 struct stServerInfo {
 	SOCKADDR_IN m_saServer;
 	std::list <cPacket *> m_lSentPackets;
@@ -104,7 +129,7 @@ struct stServerInfo {
 	DWORD	m_dwLastPing;
 	DWORD	m_dwLastSyncSent;
 	DWORD	m_dwLastSyncRecv;
-	double	m_flServerTime; //At our last sync, this was the server's time
+    double	m_flServerTime; //At our last sync, this was the server's time
 
 	//Flags to determine our status/phase
 	DWORD	m_dwFlags;
@@ -158,6 +183,7 @@ public:
     void SendEnterWorldMessage(DWORD GUID, char *account);
 	void DownloadLandblock(DWORD Landblock);
 	void SendPositionUpdate(stLocation *Location, stMoveInfo *MoveInfo);
+    void SendMoveToState(stLocation *Location, stMoveInfo *MoveInfo, float Heading);
 	void SendAnimUpdate(int iFB, int iStrafe, int iTurn, bool bRunning);
 	void SetCombatMode(bool CombatMode);
 	void CastSpell(DWORD Target, DWORD Spell);
@@ -198,6 +224,8 @@ private:
 
 	DWORD m_dwFragmentSequenceOut;
 	DWORD m_dwGameEventOut;
+
+    DWORD m_dwEnterGameTimeout; // time after which we time out trying to enter game
 
 	stServerInfo m_siLoginServer;
 	std::list <stServerInfo> m_siWorldServers;

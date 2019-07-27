@@ -203,7 +203,7 @@ void cLandblock::Load(WORD wBlock)
             {
                 return;
             }
-			DModel->SetScale(1/240.0f);
+			DModel->SetScale(MODEL_SCALE_FACTOR);
 			DModel->SetTranslation(tp3d);
 			DModel->SetRotation(tpld.wHeading, tpld.aHeading, tpld.bHeading, tpld.cHeading);
 			Models.push_back(DModel);
@@ -253,7 +253,7 @@ void cLandblock::Load(WORD wBlock)
 //			OutputString(eRed, "Failed model load: %08X", m_lbFFFE.Objects[j].dwID);
 //				OutputConsoleString("Failed model load: %08X", dwModelID);
 					}
-					Model->SetScale(1/240.0f);
+					Model->SetScale(MODEL_SCALE_FACTOR);
 					Model->SetTranslation(tp3d);
 					Model->SetRotation(tpl.wHeading, tpl.aHeading, tpl.bHeading, tpl.cHeading);
 					Models.push_back(Model);
@@ -289,7 +289,7 @@ void cLandblock::Load(WORD wBlock)
                 //			OutputString(eRed, "Failed model load: %08X", m_lbFFFE.Objects[j].dwID);
 //				OutputConsoleString("Failed model load: %08X", dwModelID);
 			}
-			Model->SetScale(1/240.0f);
+			Model->SetScale(MODEL_SCALE_FACTOR);
 			Model->SetTranslation(tp3d);
 			Model->SetRotation(tpl.wHeading, tpl.aHeading, tpl.bHeading, tpl.cHeading);
 			Models.push_back(Model);
@@ -319,7 +319,7 @@ void cLandblock::Load(WORD wBlock)
                 //			OutputString(eRed, "Failed model load: %08X", dwModelID);
 //				OutputConsoleString("Failed model load: %08X", dwModelID);
 			}
-			Model->SetScale(1/240.0f);
+			Model->SetScale(MODEL_SCALE_FACTOR);
 			Model->SetTranslation(tp3d);
 			Model->SetRotation(tpl.wHeading, tpl.aHeading, tpl.bHeading, tpl.cHeading);
 			Models.push_back(Model);
@@ -378,7 +378,7 @@ int cLandblock::Draw()
 		fYCorn = (float) ((((dwBlockY+1.00f) * 8.0f) - 1027.5) / 10.0f);
 	}
 
-	float fDiv = 240.0f/2;
+	float fDiv = (1.0/ MODEL_SCALE_FACTOR) / 2.0;
 
 			glPushName(0xDEADBEEF);
 	for (int y=0;y<8;y++)

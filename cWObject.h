@@ -10,10 +10,10 @@ public:
 	cWObject();
 	~cWObject();
 
-	void ParseF745(cMessage * Message);
-	void ParseF748(cMessage * Message);
-	void ParseF74C(cMessage * Message);
-	void ParseF625(cMessage * Message);
+	void ParseItemCreateObject(cMessage * Message);
+	void ParseMovementPositionEvent(cMessage * Message);
+	void ParseMovementSetObjectMovement(cMessage * Message);
+	void ParseItemObjDescEvent(cMessage * Message);
 	void AdjustStack(DWORD Count, DWORD Value);
 	void Set229(DWORD Type, DWORD Value);
 	void Set22D(DWORD Type, DWORD Value);

@@ -15,27 +15,33 @@ cInterface::cInterface()
 	m_dwSelChar = 0;
 	m_dwLastAttacker = 0;
 	m_vWMessages.clear();
+    m_dwLastLocationUpdate = 0;
 
 	m_bFirstSize = true;
+
 
 	m_fCamDist = 0.025f;
 	m_fCamRotX = (float) M_PI;
 	m_fCamRotY = (float) M_PI/3;
 
-	bForward = false;
-	bBack = false;
-	bLeft = false;
-	bRight = false;
-	bStrLeft = false;
-	bStrRight = false;
-	bShift = false;
+    m_MotionControlsState.forward = false;
+    m_MotionControlsState.sidestepLeft = false;
+    m_MotionControlsState.sidestepRight = false;
+    m_MotionControlsState.backward = false;
+    m_MotionControlsState.turnLeft = false;
+    m_MotionControlsState.turnRight = false;
+    m_MotionControlsState.walk = false;
+    m_MotionControlsState.autoRun = false;
+
 	bAnimUpdate = false;
 
+    // XXX: get this from character stats?
 	fSpeed = 32;
 	
+    // XXX: where does this starting value come from?
 	FlyerCenter = cPoint3D(93.45f, -82.15f, 0.85f);
 //	FlyerCenter = cPoint3D(0, 0, 5);
-	bRotating = false;
+	bRotatingCamera = false;
 
 	m_dwCurSelect = 0;
 	m_mgChars[0] = 0;
@@ -404,10 +410,11 @@ int cInterface::Draw(RECT rRect, HDC hDC)
 	float fTimeDiff = (float) (liTemp.QuadPart - liLast.QuadPart)/liFreq.QuadPart;
 	liLast = liTemp;
 
+    // update positions of objects (this include updating character position based on control inputs)
 	m_ObjectDB->UpdateObjects(fTimeDiff);
 
 	//check for message sending
-	//nuke this asap...
+	//XXX: nuke this asap...
 	while (m_mwChat->GetNeedSend())
 	{
 		//send message
@@ -428,6 +435,15 @@ int cInterface::Draw(RECT rRect, HDC hDC)
 	if (m_InterfaceMode == eGame)
 	{
 		glClearColor( 107.0f/255, 178.0f/255, 255.0f/255, 1.0f );
+
+        // send new player position if we haven't in the last LOCATION_UPDATE_INTERVAL_MS
+        if (m_dwLastLocationUpdate + LOCATION_UPDATE_INTERVAL_MS < GetTickCount()) {
+            cWObject *woMyself = m_ObjectDB->FindObject(m_dwSelChar);
+            if (woMyself) {
+                m_Network->SendPositionUpdate(woMyself->GetLocation(), &woMyself->GetMoveInfo());
+            }
+            m_dwLastLocationUpdate = GetTickCount();
+        }
 	}
 
 	if (bAnimUpdate)
@@ -436,26 +452,35 @@ int cInterface::Draw(RECT rRect, HDC hDC)
 
 		int iFB = 0, iStrafe = 0, iTurn = 0;
 
-		if (bForward)
+		if (m_MotionControlsState.forward)
 			iFB++;
-		if (bBack)
+		if (m_MotionControlsState.backward)
 			iFB--;
-		if (bLeft)
+		if (m_MotionControlsState.turnLeft)
 			iTurn--;
-		if (bRight)
+		if (m_MotionControlsState.turnRight)
 			iTurn++;
-		if (bStrLeft)
+		if (m_MotionControlsState.sidestepLeft)
 			iStrafe--;
-		if (bStrRight)
+		if (m_MotionControlsState.sidestepRight)
 			iStrafe++;
 
-		m_Network->SendAnimUpdate(iFB, iStrafe, iTurn, !bShift);
+		m_Network->SendAnimUpdate(iFB, iStrafe, iTurn, !m_MotionControlsState.walk);
 
 		//Update velocity info
+        // XXX: should this be before UpdateObjects and SendPositionUpdate????
 		cWObject *woMyself = m_ObjectDB->FindObject(m_dwSelChar);
 		if (woMyself)
 		{
+            m_ObjectDB->Lock();
 			woMyself->SetMoveVelocities(iFB*3.0f, iStrafe*-1.0f, iTurn*1.5f);
+            // process movement to update Location (not the same as Position -- Location is shared /w server!)
+            //XXX: stLocation *lPlayer = woMyself->GetLocation();
+            //XXX: stMoveInfo mPlayer = woMyself->GetMoveInfo();
+            //XXX: float fPlayerHeading = woMyself->GetHeading();
+            //XXX: lPlayer->xOffset -= -sin(fPlayerHeading);
+            //XXX: lPlayer->yOffset += -cos(fPlayerHeading);
+            m_ObjectDB->Unlock();
 		}
 	}
 
@@ -522,6 +547,12 @@ void cInterface::SetInterfaceMode(eInterfaceMode Mode)
 //		m_mwMinimap->SetVisible(true);
 		m_mwWindowToolbar->SetVisible(true);
 //		m_picMap->SetVisible(true);
+        m_picEnterGame->SetVisible(false);
+        m_stMOTD->SetVisible(false);
+        m_picSelChar->SetVisible(false);
+        for (int i = 0;i < 5;i++)
+            m_stCharList[i]->SetVisible(false);
+        break;
 		break;
 	case eMOTD:
 		m_pbConnecting->SetVisible(false);
@@ -793,7 +824,7 @@ void cInterface::ParseEditInput( std::string &szInput )
 
 bool cInterface::OnMouseMove( IWindow & Window, float X, float Y, unsigned long Button )
 {
-	if (bRotating)
+	if (bRotatingCamera)
 	{
 		m_fCamRotX = fStartX + (X - fLastX)/100;
 		m_fCamRotY = fStartY - (Y - fLastY)/100;
@@ -820,7 +851,7 @@ bool cInterface::OnMouseDown( IWindow & Window, float X, float Y, unsigned long 
 {
 	if (Button & 2)
 	{
-		bRotating = true;
+		bRotatingCamera = true;
 		fLastX = X;
 		fLastY = Y;
 		fStartX = m_fCamRotX;
@@ -861,7 +892,7 @@ bool cInterface::OnMouseDown( IWindow & Window, float X, float Y, unsigned long 
 		CamUp.RotateAround(cPoint3D(0,0,0), cPoint3D(0, 0, -m_fCamRotX));
 
 		gluLookAt(MyPos.x, MyPos.y, MyPos.z, CamLoc.x, CamLoc.y, CamLoc.z, CamUp.x, CamUp.y, CamUp.z);
-//		gluLookAt(CamLoc.x, CamLoc.y, CamLoc.z + 1.0f/240.0f, MyPos.x, MyPos.y, MyPos.z + 1.0f/240.0f, CamUp.x, CamUp.y, CamUp.z);
+//		gluLookAt(CamLoc.x, CamLoc.y, CamLoc.z + MODEL_SCALE_FACTOR, MyPos.x, MyPos.y, MyPos.z + MODEL_SCALE_FACTOR, CamUp.x, CamUp.y, CamUp.z);
 
 		int dwBlockX = 1.25f*(101.95+FlyerCenter.x);
 		if (dwBlockX < 0) dwBlockX = 0;
@@ -995,7 +1026,7 @@ bool cInterface::OnMouseDown( IWindow & Window, float X, float Y, unsigned long 
 		CamUp.RotateAround(cPoint3D(0,0,0), cPoint3D(m_fCamRotY, 0, 0));
 		CamUp.RotateAround(cPoint3D(0,0,0), cPoint3D(0, 0, m_fCamRotX+fMyHead));
 
-		gluLookAt(CamLoc.x, CamLoc.y, CamLoc.z + 1.0f/240.0f, MyPos.x, MyPos.y, MyPos.z + 1.0f/240.0f, CamUp.x, CamUp.y, CamUp.z);
+		gluLookAt(CamLoc.x, CamLoc.y, CamLoc.z + MODEL_SCALE_FACTOR, MyPos.x, MyPos.y, MyPos.z + MODEL_SCALE_FACTOR, CamUp.x, CamUp.y, CamUp.z);
 
 		m_ObjectDB->Lock();
 		std::list<cWObject *> * DrawList = m_ObjectDB->GetObjectsWithin(MyPos, 3.3f);
@@ -1032,7 +1063,7 @@ bool cInterface::OnMouseDown( IWindow & Window, float X, float Y, unsigned long 
 
 bool cInterface::OnMouseUp( IWindow & Window, float X, float Y, unsigned long Button )
 {
-	bRotating = false;
+	bRotatingCamera = false;
 
 	if (m_InterfaceMode == eMOTD)
 	{
@@ -1057,35 +1088,35 @@ bool cInterface::OnKeyUp( IWindow & Window, unsigned long KeyCode )
 {
 	if (KeyCode == 'W')
 	{
-		bForward = false;
+        m_MotionControlsState.forward = false;
 		bAnimUpdate = true;
 	}
-	if (KeyCode == 'S')
+	if (KeyCode == 'X')
 	{
-		bBack = false;
+        m_MotionControlsState.backward = false;
 		bAnimUpdate = true;
 	}
 	if (KeyCode == 'A')
 	{
-		bLeft = false;
+        m_MotionControlsState.turnLeft = false;
 		bAnimUpdate = true;
 	}
 	if (KeyCode == 'D')
 	{
-		bRight = false;
+        m_MotionControlsState.turnRight = false;
 		bAnimUpdate = true;
 	}
 	if (KeyCode == 'Z')
 	{
-		bStrLeft = false;
+        m_MotionControlsState.sidestepLeft = false;
 		bAnimUpdate = true;
 	}
 	if (KeyCode == 'C')
 	{
-		bStrRight = false;
+        m_MotionControlsState.sidestepRight = false;
 		bAnimUpdate = true;
 	}
-	if (KeyCode == 'F')
+	if (KeyCode == 'F') // cycle through speed scaling
 	{
 		if (fSpeed == 1)
 			fSpeed = 2;
@@ -1179,81 +1210,54 @@ bool cInterface::OnKeyDown( IWindow & Window, unsigned long KeyCode )
 
 	if (KeyCode == 'W')
 	{
-		if (!bForward)
+		if (!m_MotionControlsState.forward)
 		{
-			bForward = true;
+            m_MotionControlsState.forward = true;
 			bAnimUpdate = true;
 		}
 	}
 
-	if (KeyCode == 'S')
+	if (KeyCode == 'X')
 	{
-		if (!bBack)
+		if (!m_MotionControlsState.backward)
 		{
-			bBack = true;
+            m_MotionControlsState.backward = true;
 			bAnimUpdate = true;
 		}
-
-/*		cWObject *woMyself = m_ObjectDB->FindObject(m_dwSelChar);
-		if (woMyself)
-		{
-			m_ObjectDB->Lock();
-			stLocation *lTemp = woMyself->GetLocation();
-			stMoveInfo mTemp = woMyself->GetMoveInfo();
-			float fHead = woMyself->GetHeading();
-			lTemp->xOffset -= -sin(fHead);
-			lTemp->yOffset += -cos(fHead);
-			m_ObjectDB->Unlock();
-			m_Network->SendPositionUpdate(lTemp, &mTemp);
-
-			stLocation *lTemp = woMyself->GetLocation();
-			stMoveInfo mTemp = woMyself->GetMoveInfo();
-
-			cPacket *CS = new cPacket();
-			CS->Add((DWORD) 0xF61C);
-			CS->Add((DWORD) 5);
-			CS->Add((DWORD) 2);				//flag 1 - running
-			CS->Add((DWORD) 0x45000005);	//flag 4 - forward
-			CS->Add(lTemp, sizeof(stLocation));	//full location
-			mTemp.moveCount = 0;
-			CS->Add(&mTemp, sizeof(stMoveInfo));	//movement info
-			CS->Add((DWORD) 1);				//?
-			m_Network->SendWSGameEvent(CS, 5);	//definitely group 5
-		}*/
 	}
 
 	if (KeyCode == 'A')
 	{
-		if (!bLeft)
+		if (!m_MotionControlsState.turnLeft)
 		{
-			bLeft = true;
+            m_MotionControlsState.turnLeft = true;
 			bAnimUpdate = true;
 		}
 	}
 
 	if (KeyCode == 'D')
 	{
-		if (!bRight)
+		if (!m_MotionControlsState.turnRight)
 		{
-			bRight = true;
+            m_MotionControlsState.turnRight = true;
 			bAnimUpdate = true;
 		}
 	}
 
 	if (KeyCode == 'Z')
 	{
-		if (!bStrLeft)
+		if (!m_MotionControlsState.sidestepLeft)
 		{
-			bStrLeft = true;
+            m_MotionControlsState.sidestepLeft = true;
 			bAnimUpdate = true;
 		}
 	}
 
 	if (KeyCode == 'C')
 	{
-		if (!bStrRight)
+		if (!m_MotionControlsState.sidestepRight)
 		{
-			bStrRight = true;
+            m_MotionControlsState.sidestepRight = true;
 			bAnimUpdate = true;
 		}
 	}
@@ -1726,7 +1730,7 @@ bool cInterface::OnRender( IWindow & Window, double TimeSlice )
 		CamUp.RotateAround(cPoint3D(0,0,0), cPoint3D(m_fCamRotY, 0, 0));
 		CamUp.RotateAround(cPoint3D(0,0,0), cPoint3D(0, 0, m_fCamRotX+fMyHead));
 
-		gluLookAt(CamLoc.x, CamLoc.y, CamLoc.z + 1.0f/240.0f, MyPos.x, MyPos.y, MyPos.z + 1.0f/240.0f, CamUp.x, CamUp.y, CamUp.z);
+		gluLookAt(CamLoc.x, CamLoc.y, CamLoc.z + MODEL_SCALE_FACTOR, MyPos.x, MyPos.y, MyPos.z + MODEL_SCALE_FACTOR, CamUp.x, CamUp.y, CamUp.z);
 
 		LARGE_INTEGER tpt1, tpt2, tpt3, tpf;
 		QueryPerformanceFrequency(&tpf);

@@ -35,6 +35,7 @@ enum eInterfaceMode {
 	eGame
 };
 
+
 class cNetwork;
 
 class cInterface : public cLockable, public CWindow,
@@ -142,10 +143,24 @@ private:
 	int m_iRenderRadius;
 	cPoint3D FlyerCenter;
 	float fLastX, fLastY, fStartX, fStartY;
-	bool bRotating;
-	bool bForward, bBack, bLeft, bRight, bShift, bStrLeft, bStrRight;
-	bool bAnimUpdate;
+	bool bRotatingCamera;
+
+    //player movement
+    struct MotionControlsState {
+        bool forward;
+        bool sidestepLeft;
+        bool sidestepRight;
+        bool backward;
+        bool turnLeft;
+        bool turnRight;
+        bool walk;
+        bool autoRun;
+    };
+
+    MotionControlsState m_MotionControlsState;
+
 	float fSpeed;
+    bool bAnimUpdate;
 
 	std::map<WORD, cLandblock *> m_mLandblocks;
 	std::unordered_set<WORD> m_mCurrentLandblocks, m_mNeedToLoadBlocks, m_mDownloadingLandblocks;
@@ -188,6 +203,8 @@ private:
 
 	cSpellBar *m_mwSpellBar;
 
+    // time that we last sent a location update
+    DWORD m_dwLastLocationUpdate;
 };
 
 #include "cNetwork.h"

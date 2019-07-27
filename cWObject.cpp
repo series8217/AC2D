@@ -54,8 +54,11 @@ int cWObject::Draw()
 
 void cWObject::SetMoveVelocities(float fFB, float fStrafe, float fTurn)
 {
+    // forward is positive
 	fVelocityFB = fFB;
+    // right is positive
 	fVelocityStrafe = fStrafe;
+    // right is positive
 	fVelocityTurn = fTurn;
 	m_bMoving = ((fFB != 0) || (fStrafe != 0) || (fTurn != 0));
 }
@@ -65,6 +68,7 @@ void cWObject::UpdatePosition(float fTimeDiff)
 	Lock();
 	if (m_bMoving)
 	{
+        // XXX: Velocity is never set, so this doesn't seem to have any purpose
 		CalcPosition += Velocity*fTimeDiff;
 
 		//Turning...
@@ -74,16 +78,31 @@ void cWObject::UpdatePosition(float fTimeDiff)
 			fCurHeading -= (float) (2*M_PI);
 		if (fCurHeading < 0)
 			fCurHeading += (float) (2*M_PI);
+        // load heading back into location
 		LoadLocationHeading(fCurHeading);
 
 		//Forwards/Backwards
 		cPoint3D tpstrafe(0,1,0);
 		tpstrafe.RotateAround(cPoint3D(0,0,0), cPoint3D(0,0,fCurHeading));
-		CalcPosition += tpstrafe*(fVelocityFB*fTimeDiff/240.0f);
+        // position (3d model)
+		CalcPosition += tpstrafe*(fVelocityFB*fTimeDiff*MODEL_SCALE_FACTOR);
+        // location (server space)
+        location.xOffset += -sin(fCurHeading)*fVelocityFB*fTimeDiff;
+        location.yOffset += cos(fCurHeading)*fVelocityFB*fTimeDiff;
 
 		//Strafing
 		tpstrafe.RotateAround(cPoint3D(0,0,0), cPoint3D(0,0,(float) -M_PI/2));
-		CalcPosition += tpstrafe*(fVelocityStrafe*fTimeDiff/240.0f);
+        // position (3d model)
+		CalcPosition += tpstrafe*(fVelocityStrafe*fTimeDiff*MODEL_SCALE_FACTOR);
+        // location (server space)
+        location.xOffset -= -sin(fCurHeading + 0.5*M_PI)*fVelocityStrafe*fTimeDiff;
+        location.yOffset += -cos(fCurHeading + 0.5*M_PI)*fVelocityStrafe*fTimeDiff;
+
+        //XXX: stLocation *lPlayer = woMyself->GetLocation();
+//XXX: stMoveInfo mPlayer = woMyself->GetMoveInfo();
+//XXX: float fPlayerHeading = woMyself->GetHeading();
+//XXX: lPlayer->xOffset -= -sin(fPlayerHeading);
+//XXX: lPlayer->yOffset += -cos(fPlayerHeading);
 
 		CalcHeading();
 	}
@@ -96,7 +115,7 @@ void cWObject::UpdatePosition(float fTimeDiff)
 			m_mgModel = new cModelGroup();
 		}
 		m_mgModel->ReadModel(modelNumber, &palettes, &textures, &models);
-		m_mgModel->SetScale((1/240.0f) * m_fScale);
+		m_mgModel->SetScale(MODEL_SCALE_FACTOR * m_fScale);
 
 		if (FirstSet)
 		{
@@ -132,8 +151,9 @@ void cWObject::PlayAnimation(WORD wAnim, WORD wStance, float fPlaySpeed, bool bS
 	}
 }
 
-void cWObject::ParseF74C(cMessage * Message)
+void cWObject::ParseMovementSetObjectMovement(cMessage * Message)
 {
+    /* 0xF74C event */
 	Lock();
 	numLogins = Message->ReadWORD();
 	WORD sequence = Message->ReadWORD();
@@ -249,7 +269,7 @@ void cWObject::ParseF74C(cMessage * Message)
 			GoTo.CalcFromLocation(&tpLoc);
 			Velocity = (GoTo - CalcPosition);
 			Velocity.Normalize();
-			Velocity *= animation_speed/240;
+			Velocity *= animation_speed*MODEL_SCALE_FACTOR;
 			m_bMoving = true;
 
 			break;
@@ -266,7 +286,7 @@ void cWObject::ParseF74C(cMessage * Message)
 			GoTo.CalcFromLocation(&tpLoc);
 			Velocity = (GoTo - CalcPosition);
 			Velocity.Normalize();
-			Velocity *= animation_speed/240;
+			Velocity *= animation_speed* MODEL_SCALE_FACTOR;
 			m_bMoving = true;
 
 			break;
@@ -293,8 +313,9 @@ void cWObject::ParseF74C(cMessage * Message)
 	Unlock();
 }
 
-void cWObject::ParseF625(cMessage * Message)
+void cWObject::ParseItemObjDescEvent(cMessage * Message)
 {
+    // 0xF625 event
 	Lock();
 	Message->ReadByte();	//eleven
 	int paletteCount = Message->ReadByte();
@@ -342,13 +363,14 @@ void cWObject::ParseF625(cMessage * Message)
 	Unlock();
 }
 
-void cWObject::ParseF745(cMessage * Message)
+void cWObject::ParseItemCreateObject(cMessage * Message)
 {
+    /* 0xF745 event */
 	Lock();
 	GUID = Message->ReadDWORD();
 
 	//mmm, code reuse
-	ParseF625(Message);
+	ParseItemObjDescEvent(Message);
 
 	DWORD flags = Message->ReadDWORD();
 	portalMode = Message->ReadWORD();
@@ -455,8 +477,8 @@ void cWObject::ParseF745(cMessage * Message)
 	if ((flags & 0x4004) == 0x4004)
 	{
 		Velocity = cPoint3D(unknown_trio1_1, unknown_trio1_2, unknown_trio1_3);
-		Velocity *= 1.0f/240;
-//		Velocity *= unknown_bluegrey/240;	//unknown_bluegrey's connection hasn't been explored yet
+		Velocity *= MODEL_SCALE_FACTOR;
+//		Velocity *= unknown_bluegrey*MODEL_SCALE_FACTOR;	//unknown_bluegrey's connection hasn't been explored yet
 		m_bMoving = true;
 	}
 	//blah!
@@ -638,8 +660,10 @@ void cWObject::ParseF745(cMessage * Message)
 	Unlock();
 }
 
-void cWObject::ParseF748(cMessage * Message)
+void cWObject::ParseMovementPositionEvent(cMessage * Message)
 {
+    // 0xF748 message
+    // Server updated position of object
 	Lock();
 
 	DWORD flags = Message->ReadDWORD();

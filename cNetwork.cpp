@@ -36,7 +36,10 @@ cNetwork::cNetwork()
 	siSockAddr.sin_addr.s_addr	= INADDR_ANY;
 	m_sSocket = socket( AF_INET, SOCK_DGRAM, IPPROTO_UDP );
 
+    // XXX: do we need to increment this so CheckPings works?
 	iConnPacketCount = 0;
+
+    m_dwEnterGameTimeout = 0; // ignored when zero
 
 	bPortalMode = false;
 
@@ -188,6 +191,8 @@ void cNetwork::Reset()
     // start 0. we pre-increment for each fragment so the first one out will be 1
     // XXX: should we be keeping track of this separately for each server? also when do we start it back at 0?
 	m_dwFragmentSequenceOut = 0;
+
+    m_dwEnterGameTimeout = 0;
 }
 
 static DWORD checksum(const void* data, size_t size)
@@ -647,9 +652,15 @@ void cNetwork::Run()
 			{
 				m_Interface->OutputConsoleString("Timed out after %d ms.", TIMEOUT_MS);
 				m_Interface->OutputConsoleString("Couldn't connect first time, trying again..");
-				Connect();
+                Connect();
 			}
 		}
+
+        // when entering game, m_dwEnterGameTimeout is nonzero, until 0xF7DF packet received
+        if (m_dwEnterGameTimeout > 0 && m_dwEnterGameTimeout < GetTickCount()) {
+            MessageBox(NULL, "Timed out trying to enter game", "Network Error", MB_OK);
+            Connect();
+        }
 
 		cPacket *Packet = new cPacket();
 		BYTE bRawData[1024];
@@ -705,6 +716,11 @@ void cNetwork::Run()
 			delete Packet;
 		}
 
+        if (m_pActiveWorld->m_dwLastPacketAck + ACK_INTERVAL_MS < GetTickCount()) {
+            // send packet ACK to server as keep-alive so we don't time out
+            // XXX: this doesn't seem to be enough to keep connection alive. what do we need to send?
+            SendAckPacket(m_pActiveWorld); 
+        }
 		CheckPings();
 	}
 }
@@ -887,7 +903,9 @@ void cNetwork::ProcessPacket(cPacket *Packet, stServerInfo *Server)
     
         m_pActiveWorld->clientXorGen = Server->clientXorGen;
         m_pActiveWorld->serverXorGen = Server->serverXorGen;
-        m_pActiveWorld->m_dwFlags |= SF_CRCSEEDS;
+        m_pActiveWorld->m_dwFlags |= SF_CRCSEEDS | SF_CONNECTED;
+        m_pActiveWorld->m_wLogicalID = Server->m_wLogicalID;
+        m_pActiveWorld->m_wTable = 0x14; // XXX: from pcaps?
     }
     
     if (dwFlags & kNetError1)
@@ -1459,73 +1477,74 @@ void cNetwork::ServerCharacterError(DWORD Error)
 	//these will occur when logging in or creating a character
 	switch(Error)
 	{
-	case 0x01:
-		m_Interface->OutputConsoleString("Cannot have two accounts logged on at the same time.");
-		break;
-	case 0x03:
-		m_Interface->OutputConsoleString("Server could not access your account information. Please try again in a few minutes.");
-		break;
-	case 0x04:
-		m_Interface->OutputConsoleString("The server has disconnected. Please try again in a few minutes.");
-		break;
-	case 0x05:
-		m_Interface->OutputConsoleString("Server could not log off your character.");
-		break;
-	case 0x06:
-		m_Interface->OutputConsoleString("Server could not delete your character.");
-		break;
-	case 0x08:
-		m_Interface->OutputConsoleString("The account you specified is already in use.");
-		break;
-	case 0x09:
-		m_Interface->OutputConsoleString("The account name you specified was not valid.");
-		break;
-	case 0x0A:
-		m_Interface->OutputConsoleString("The account you specified doesn't exist.");
-		break;
-	case 0x0B:
-		m_Interface->OutputConsoleString("Server could not put your character in the game. Please try again in a few minutes.");
-		break;
-	case 0x0C:
-		m_Interface->OutputConsoleString("You cannot enter the game with a stress creating character.");
-		break;
-	case 0x0D:
-		m_Interface->OutputConsoleString("One of your characters is still in the world. Please try again in a few minutes.");
-		break;
-	case 0x0E:
-		m_Interface->OutputConsoleString("Server unable to find player account. Please try again later.");
-		break;
-	case 0x0F:
-		m_Interface->OutputConsoleString("You do not own this character.");
-		break;
-	case 0x10:
-		m_Interface->OutputConsoleString("One of your characters is currently in the world. Please try again later. This is likely an internal server error.");
-		break;
-	case 0x11:
-		m_Interface->OutputConsoleString("Please try again in a few minutes. If this problem persists, the character might be out of date and no longer usable.");
-		break;
-	case 0x12:
-		m_Interface->OutputConsoleString("This character's data has been corrupted. Please delete it and create a new character.");
-		break;
-	case 0x13:
-		m_Interface->OutputConsoleString("This character's starting server is experiencing difficulties. Please try again in a few minutes.");
-		break;
-	case 0x14:
-		m_Interface->OutputConsoleString("This character couldn't be placed in the world right now. Please try again in a few minutes.");
-		break;
-	case 0x15:
-		m_Interface->OutputConsoleString("Sorry, but the Asheron's Call server is full currently. Please try again later.");
-		break;
-	case 0x17:
-		m_Interface->OutputConsoleString("A save of this character is still in progress, please try again later.");
-		break;
-	default:
-		m_Interface->OutputConsoleString("Client: Received character error #%u", Error);
+    case 0x01:
+        MessageBox(NULL, "Cannot have two accounts logged on at the same time.", "Server Error", MB_OK);
+        break;
+    case 0x03:
+        MessageBox(NULL, "Server could not access your account information. Please try again in a few minutes.", "Server Error", MB_OK);
+        break;
+    case 0x04:
+        MessageBox(NULL, "The server has disconnected. Please try again in a few minutes.", "Server Error", MB_OK);
+        break;
+    case 0x05:
+        MessageBox(NULL, "Server could not log off your character.", "Server Error", MB_OK);
+        break;
+    case 0x06:
+        MessageBox(NULL, "Server could not delete your character.", "Server Error", MB_OK);
+        break;
+    case 0x08:
+        MessageBox(NULL, "The account you specified is already in use.", "Server Error", MB_OK);
+        break;
+    case 0x09:
+        MessageBox(NULL, "The account name you specified was not valid.", "Server Error", MB_OK);
+        break;
+    case 0x0A:
+        MessageBox(NULL, "The account you specified doesn't exist.", "Server Error", MB_OK);
+        break;
+    case 0x0B:
+        MessageBox(NULL, "Server could not put your character in the game. Please try again in a few minutes.", "Server Error", MB_OK);
+        break;
+    case 0x0C:
+        MessageBox(NULL, "You cannot enter the game with a stress creating character.", "Server Error", MB_OK);
+        break;
+    case 0x0D:
+        MessageBox(NULL, "One of your characters is still in the world. Please try again in a few minutes.", "Server Error", MB_OK);
+        break;
+    case 0x0E:
+        MessageBox(NULL, "Server unable to find player account. Please try again later.", "Server Error", MB_OK);
+        break;
+    case 0x0F:
+        MessageBox(NULL, "You do not own this character.", "Server Error", MB_OK);
+        break;
+    case 0x10:
+        MessageBox(NULL, "One of your characters is currently in the world. Please try again later. This is likely an internal server error.", "Server Error", MB_OK);
+        break;
+    case 0x11:
+        MessageBox(NULL, "Please try again in a few minutes. If this problem persists, the character might be out of date and no longer usable.", "Server Error", MB_OK);
+        break;
+    case 0x12:
+        MessageBox(NULL, "This character's data has been corrupted. Please delete it and create a new character.", "Server Error", MB_OK);
+        break;
+    case 0x13:
+        MessageBox(NULL, "This character's starting server is experiencing difficulties. Please try again in a few minutes.", "Server Error", MB_OK);
+        break;
+    case 0x14:
+        MessageBox(NULL, "This character couldn't be placed in the world right now. Please try again in a few minutes.", "Server Error", MB_OK);
+        break;
+    case 0x15:
+        MessageBox(NULL, "Sorry, but the Asheron's Call server is full currently. Please try again later.", "Server Error", MB_OK);
+        break;
+    case 0x17:
+        MessageBox(NULL, "A save of this character is still in progress, please try again later.", "Server Error", MB_OK);
+        break;
+    default:
+        char buf[128];
+        sprintf(buf, "Unrecognized server error code: #%d", Error);
+        MessageBox(NULL, buf, "Unrecognized error code:", MB_OK);
 		break;
 	}
 }
 
-//Is the server information even needed? *shrug*
 void cNetwork::ProcessMessage(cMessage *Msg, stServerInfo *Server)
 {
 	Msg->ReadBegin();
@@ -1820,7 +1839,7 @@ void cNetwork::ProcessMessage(cMessage *Msg, stServerInfo *Server)
 				m_ObjectDB->Unlock();
 				return;
 			}
-			woThis->ParseF625(Msg);
+			woThis->ParseItemObjDescEvent(Msg);
 			WORD modelSequenceType = Msg->ReadWORD();
 			WORD modelSequence = Msg->ReadWORD();
 			break;
@@ -1889,13 +1908,14 @@ void cNetwork::ProcessMessage(cMessage *Msg, stServerInfo *Server)
 			DWORD dwError	= Msg->ReadDWORD();
 
 			ServerCharacterError(dwError);
+            m_siLoginServer.m_dwFlags &= ~SF_CONNECTED;
 			break;
 		}
 	case 0xF745:
 		{
 			//create object
 			cWObject *tpObj = new cWObject();
-			tpObj->ParseF745(Msg);
+			tpObj->ParseItemCreateObject(Msg);
 			m_ObjectDB->AddObject(tpObj);
 
 			if (tpObj->GetGUID() == m_dwGUIDLogin)
@@ -1948,8 +1968,11 @@ void cNetwork::ProcessMessage(cMessage *Msg, stServerInfo *Server)
 			//set position/motion
 			DWORD object = Msg->ReadDWORD();
 			cWObject *tpObj = m_ObjectDB->FindObject(object);
-			if (tpObj)
-				tpObj->ParseF748(Msg);
+            //if (tpObj->GetGUID() == m_dwGUIDLogin) {
+            //    m_Interface->OutputConsoleString("IGNORED Player position updated by server");
+            //    break;
+            //}
+			tpObj->ParseMovementPositionEvent(Msg);
 			break;
 		}
 	case 0xF749:
@@ -1993,7 +2016,7 @@ void cNetwork::ProcessMessage(cMessage *Msg, stServerInfo *Server)
 			cWObject *woThis = m_ObjectDB->FindObject(object);
 			if (!woThis)
 				return;
-			woThis->ParseF74C(Msg);
+			woThis->ParseMovementSetObjectMovement(Msg);
 
 			break;
 		}
@@ -2036,11 +2059,14 @@ void cNetwork::ProcessMessage(cMessage *Msg, stServerInfo *Server)
 		{
             // Server reported OK to enter world
 
-			//Enter 3D Mode
+            // clear the enter world timeout
+            m_dwEnterGameTimeout = 0;
+            
 			m_Interface->OutputConsoleString("Enter 3D Mode.");
 
             SendEnterWorldMessage(m_dwGUIDLogin, m_zAccountName);
 
+            //Enter 3D Mode
 			m_Interface->SetInterfaceMode(eGame);
 			break;
 		}
@@ -2489,7 +2515,7 @@ void cNetwork::SendWSMessage(cPacket *Packet, WORD wGroup)
 	FragHead.m_wIndex = 0;
 	FragHead.m_wCount = 1;
 	FragHead.m_wSize = (WORD)sizeof(stFragmentHeader) + Packet->GetLength();
-	FragHead.m_wGroup = wGroup;
+	FragHead.m_wGroup = wGroup; // XXX: does this even matter? seems to usually be 0x14? ACE doesn't check it.
 
 	Msg->Add(&TransHead);
 	Msg->Add(&FragHead);
@@ -2511,6 +2537,7 @@ void cNetwork::SendLSGameEvent(cPacket *Packet, WORD wGroup)
 
 void cNetwork::SendWSGameEvent(cPacket *Packet, WORD wGroup)
 {
+    // a game event packet starts with 0xF7B1 followed by a sequence number and opcode
 	cPacket *Event = new cPacket();
 	Event->Add(0xF7B1UL);
 	Event->Add(++m_dwGameEventOut);
@@ -2561,6 +2588,7 @@ void cNetwork::SendEnterWorldRequest(DWORD GUID)
     SendWSMessage(EnterWorldReqPacket, 0x0014); // 0x0014 from pcap
     m_Interface->SetInterfaceMode(eEnteringGame);
     // TODO: start timeout waiting for 0xF7DF message
+    m_dwEnterGameTimeout = GetTickCount() + TIMEOUT_ENTER_GAME_MS;
 }
 
 void cNetwork::SendEnterWorldMessage(DWORD GUID, char* account_name)
@@ -2579,6 +2607,7 @@ void cNetwork::SendEnterWorldMessage(DWORD GUID, char* account_name)
 
 void cNetwork::SendPositionUpdate(stLocation *Location, stMoveInfo *MoveInfo)
 {
+    /** XXX: supposed to be sent by us every ~1 second when we're moving */
 	cPacket *PosUpdate = new cPacket();
 	PosUpdate->Add((DWORD) 0xF753);
 	PosUpdate->Add(Location, sizeof(stLocation));
@@ -2587,78 +2616,120 @@ void cNetwork::SendPositionUpdate(stLocation *Location, stMoveInfo *MoveInfo)
 	SendWSGameEvent(PosUpdate, 5);
 }
 
+void cNetwork::SendMoveToState(stLocation *Location, stMoveInfo *MoveInfo, float heading) {
+    cPacket *MoveToState = new cPacket();
+    MoveToState->Add((DWORD)0xF61C);
+
+    cWObject *player = m_ObjectDB->FindObject(m_dwGUIDLogin);
+    if (!player) {
+        return;
+    }
+ 
+    DWORD moveStateFlags = kCurrentStyle | kCurrentHoldKey; // always send style/stance
+
+    // raw motion state
+    // XXX: hard coded for testing -- we need to actually populate this.
+    MoveToState->Add((DWORD)kCurrentHoldKey | kForwardCommand); // PackedFlags  bits 0-10: flags, bits 11-15: command list length
+    MoveToState->Add((DWORD)0x00000002);    // current hold key is 2 -- "run"
+    MoveToState->Add((DWORD)0x45000005);	// motion command is "walk forward"
+    
+    // Position
+    MoveToState->Add(Location, sizeof(stLocation));	// position where we think we are
+
+    // sequence numbers
+    MoveToState->Add(MoveInfo, sizeof(stMoveInfo));	// instance, server control, teleport, and force position sequence
+    // whether the player has contact with the ground (0x1 == contact, 0x2 == long jump mode)
+    MoveToState->Add((DWORD)1);
+    SendWSGameEvent(MoveToState, 0x14);	// is the group/table right? ACE doesn't really care?
+}
+
 void cNetwork::SendAnimUpdate(int iFB, int iStrafe, int iTurn, bool bRunning)
 {
-	cWObject *woMyself = m_ObjectDB->FindObject(m_dwGUIDLogin);
-	if (!woMyself)
-		return;
+    cWObject *woMyself = m_ObjectDB->FindObject(m_dwGUIDLogin);
+    if (!woMyself)
+        return;
 
-	stLocation *lTemp = woMyself->GetLocation();
-	stMoveInfo mTemp = woMyself->GetMoveInfo();
-	WORD wMyStance = woMyself->GetStance();
+    stLocation *lTemp = woMyself->GetLocation();
+    stMoveInfo mTemp = woMyself->GetMoveInfo();
+    WORD wMyStance = woMyself->GetStance();
+    DWORD heldKey = 0;
+    if (bRunning) {
+        heldKey = 0x2;
+    }
+    else {
+        heldKey = 0x1;
+    }
 
-	cPacket *CS = new cPacket();
-	CS->Add((DWORD) 0xF61C);
-	
-	DWORD dwFlags = 0;
-	if (wMyStance == 0x49)
-	{
-		dwFlags |= 2;
-	}
-	if (iFB != 0)
-	{
-		dwFlags |= 4;
-		if (bRunning) dwFlags |= 1;
-	}
-	if (iTurn != 0)
-	{
-		dwFlags |= 0x102;
-	}
-	if (iStrafe != 0)
-	{
-		dwFlags |= 0x22;
-	}
+    cPacket *CS = new cPacket();
+    CS->Add((DWORD)0xF61C); // MoveToState event code
 
-	CS->Add((DWORD) dwFlags);
+    DWORD dwFlags = kCurrentHoldKey;
 
-	if (dwFlags & 1)
-		CS->Add((DWORD) 2);				//flag 1 - running
+    if (wMyStance == 0x49) {
+        dwFlags |= kCurrentStyle;
+    }
+    if (iFB != 0) {
+        dwFlags |= kForwardCommand | kForwardHoldKey;
+    }
+    if (iTurn != 0) {
+        dwFlags |= kTurnCommand;
+    }
+    if (iStrafe != 0) {
+        dwFlags |= kSideStepCommand | kSideStepHoldKey;
+    }
 
-	if (dwFlags & 2)
+    CS->Add((DWORD)dwFlags); // flags
+
+    if (dwFlags & kCurrentHoldKey) {
+        CS->Add((DWORD)heldKey);
+    }
+
+    if (dwFlags & kCurrentStyle) {
+        //XXX: CS->Add((DWORD)wMyStance | 0x80000000);
+        CS->Add((DWORD)0x8000003d); // non-combat
+    }
+
+    if (dwFlags & kForwardCommand) {
+        if (iFB > 0) {
+            CS->Add((DWORD)0x45000005);	//flag 4 - forwards
+        }
+        else {
+            CS->Add((DWORD)0x45000006);	//flag 4 - backwards
+        }
+    }
+
+    if (dwFlags & kForwardHoldKey) {
+        CS->Add((DWORD)heldKey);
+    }
+
+    if (dwFlags & kSideStepCommand) {
+        if (iStrafe > 0) {
+            CS->Add((DWORD)0x6500000F);	//flag 20 - right
+        }
+        else {
+            CS->Add((DWORD)0x65000010);	//flag 20 - left
+        }
+    }
+
+    if (dwFlags & kSideStepHoldKey){
+        CS->Add((DWORD)heldKey);
+    }
+
+	if (dwFlags & kTurnCommand)
 	{
-		CS->Add((WORD) wMyStance);
-		CS->Add((WORD) 0x8000);
-	}
-
-	if (dwFlags & 4)
-	{
-		if (iFB > 0)
-			CS->Add((DWORD) 0x45000005);	//flag 4 - forwards
-		else
-			CS->Add((DWORD) 0x45000006);	//flag 4 - backwards
-	}
-
-	if (dwFlags & 0x20)
-	{
-		if (iStrafe > 0)
-			CS->Add((DWORD) 0x6500000F);	//flag 20 - right
-		else
-			CS->Add((DWORD) 0x65000010);	//flag 20 - left
-	}
-
-	if (dwFlags & 0x100)
-	{
-		if (iTurn > 0)
-			CS->Add((DWORD) 0x6500000D);	//flag 100 - right
-		else
-			CS->Add((DWORD) 0x6500000E);	//flag 100 - left
+        if (iTurn > 0) {
+            CS->Add((DWORD)0x6500000D);	//flag 100 - right
+        }
+        else {
+            CS->Add((DWORD)0x6500000E);	//flag 100 - left
+        }
 	}
 
 	CS->Add(lTemp, sizeof(stLocation));	//full location
-	mTemp.moveCount = woMyself->GetAnimCount();	//f74ccount;
+	mTemp.moveCount = woMyself->GetAnimCount();	//f74c count;
 	CS->Add(&mTemp, sizeof(stMoveInfo));	//movement info
 	CS->Add((DWORD) 1);				//?	also seen as 0 for just position updates...
-	SendWSGameEvent(CS, 5);	//definitely group 5
+	SendWSGameEvent(CS, 5);	// XXX: prev comment was: "definitely group 5"
 }
 
 void cNetwork::SetCombatMode(bool CombatMode)
@@ -2771,9 +2842,9 @@ stServerInfo * cNetwork::AddWorldServer(SOCKADDR_IN NewServer)
 	memcpy(&tpNewServer.m_saServer, &NewServer, sizeof(SOCKADDR_IN));
 	tpNewServer.m_lSentPackets.clear();
     tpNewServer.m_dwSendSequence = 1;
-	tpNewServer.m_wLogicalID = 0;
-	tpNewServer.m_wTable = 0;
-	tpNewServer.m_dwFlags = 0;
+	tpNewServer.m_wLogicalID = 0; // XXX: need to get this from server
+	tpNewServer.m_wTable = 0;     // XXX: need to get this from server
+	tpNewServer.m_dwFlags = 0;    // XXX: need to set connected flag, get CRC seeds
 	tpNewServer.m_dwLastPing = GetTickCount();
 	tpNewServer.m_dwLastSyncSent = 0;
 	tpNewServer.m_dwRecvSequence = 0; // should we start this at 2?

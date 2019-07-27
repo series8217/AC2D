@@ -120,7 +120,7 @@ public:
 
 	void CalcFromLocation(stLocation *Loc)
 	{
-		z = Loc->zOffset / 240.0f;
+		z = Loc->zOffset * MODEL_SCALE_FACTOR;
 
 		DWORD dwBlockX = (Loc->landblock & 0xff000000) >> 24;
 		DWORD dwBlockY = (Loc->landblock & 0x00ff0000) >> 16;
@@ -128,8 +128,8 @@ public:
 		if (dwBlockX < 3)
 		{
 			// dungeon, dwBlockX and dwBlockY remain constant - just use x and y
-			x = Loc->xOffset / 240.0f;
-			y = Loc->yOffset / 240.0f;
+			x = Loc->xOffset * MODEL_SCALE_FACTOR;
+			y = Loc->yOffset * MODEL_SCALE_FACTOR;
 		}
 		else
 		{

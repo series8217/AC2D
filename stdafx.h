@@ -11,6 +11,7 @@ typedef unsigned __int64 QWORD;
 #define _WIN32_WINNT 0x500
 #define _WIN32_WINDOWS 0x500
 
+// Uncomment to disable network and allow exploration mode only
 //#define TerrainOnly
 
 
@@ -51,6 +52,8 @@ typedef unsigned __int64 QWORD;
                                     __FILE__ , __LINE__ )
 #define new NEW_INLINE_WORKAROUND
 
+#define MODEL_SCALE_FACTOR  (1.0f/240.0f)
+
 struct stTransitHeader	//20 bytes
 {
 	DWORD m_dwSequence;
@@ -69,7 +72,7 @@ struct stFragmentHeader	//16 bytes
 	WORD	m_wCount;
 	WORD	m_wSize;
 	WORD	m_wIndex;
-	WORD	m_wGroup;
+	WORD	m_wGroup; // aka Queue
 };
 
 enum eColor {
@@ -143,17 +146,17 @@ const BYTE cColor[][3] = {
 struct stLocation {	//32 bytes
 	DWORD landblock;
 	float xOffset, yOffset, zOffset;
-	float wHeading;
-	float aHeading;
-	float bHeading;
-	float cHeading;
+	float wHeading; // W
+	float aHeading; // X
+	float bHeading; // Y
+	float cHeading; // Z
 };
 
 struct stMoveInfo {	//8 bytes
-	WORD numLogins;
-	WORD moveCount;
-	WORD numPortals;
-	WORD numOverride;
+	WORD numLogins; // Instance sequence value (number of logins for players?)
+	WORD moveCount; // server control sequence
+	WORD numPortals; // teleport sequence
+	WORD numOverride; // force position sequence
 };
 
 // defined in AC2DTest.cpp
