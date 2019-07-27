@@ -183,8 +183,7 @@ public:
     void SendEnterWorldMessage(DWORD GUID, char *account);
 	void DownloadLandblock(DWORD Landblock);
 	void SendPositionUpdate(stLocation *Location, stMoveInfo *MoveInfo);
-    void SendMoveToState(stLocation *Location, stMoveInfo *MoveInfo, float Heading);
-	void SendAnimUpdate(int iFB, int iStrafe, int iTurn, bool bRunning);
+	void SendMoveUpdate(int iFB, int iStrafe, int iTurn, bool bRunning);
 	void SetCombatMode(bool CombatMode);
 	void CastSpell(DWORD Target, DWORD Spell);
 	void SendAllegianceRecall();

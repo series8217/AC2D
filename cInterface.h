@@ -160,7 +160,7 @@ private:
     MotionControlsState m_MotionControlsState;
 
 	float fSpeed;
-    bool bAnimUpdate;
+    bool bMotionUpdate;
 
 	std::map<WORD, cLandblock *> m_mLandblocks;
 	std::unordered_set<WORD> m_mCurrentLandblocks, m_mNeedToLoadBlocks, m_mDownloadingLandblocks;

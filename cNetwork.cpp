@@ -2616,34 +2616,7 @@ void cNetwork::SendPositionUpdate(stLocation *Location, stMoveInfo *MoveInfo)
 	SendWSGameEvent(PosUpdate, 5);
 }
 
-void cNetwork::SendMoveToState(stLocation *Location, stMoveInfo *MoveInfo, float heading) {
-    cPacket *MoveToState = new cPacket();
-    MoveToState->Add((DWORD)0xF61C);
-
-    cWObject *player = m_ObjectDB->FindObject(m_dwGUIDLogin);
-    if (!player) {
-        return;
-    }
- 
-    DWORD moveStateFlags = kCurrentStyle | kCurrentHoldKey; // always send style/stance
-
-    // raw motion state
-    // XXX: hard coded for testing -- we need to actually populate this.
-    MoveToState->Add((DWORD)kCurrentHoldKey | kForwardCommand); // PackedFlags  bits 0-10: flags, bits 11-15: command list length
-    MoveToState->Add((DWORD)0x00000002);    // current hold key is 2 -- "run"
-    MoveToState->Add((DWORD)0x45000005);	// motion command is "walk forward"
-    
-    // Position
-    MoveToState->Add(Location, sizeof(stLocation));	// position where we think we are
-
-    // sequence numbers
-    MoveToState->Add(MoveInfo, sizeof(stMoveInfo));	// instance, server control, teleport, and force position sequence
-    // whether the player has contact with the ground (0x1 == contact, 0x2 == long jump mode)
-    MoveToState->Add((DWORD)1);
-    SendWSGameEvent(MoveToState, 0x14);	// is the group/table right? ACE doesn't really care?
-}
-
-void cNetwork::SendAnimUpdate(int iFB, int iStrafe, int iTurn, bool bRunning)
+void cNetwork::SendMoveUpdate(int iFB, int iStrafe, int iTurn, bool bRunning)
 {
     cWObject *woMyself = m_ObjectDB->FindObject(m_dwGUIDLogin);
     if (!woMyself)
@@ -2728,7 +2701,7 @@ void cNetwork::SendAnimUpdate(int iFB, int iStrafe, int iTurn, bool bRunning)
 	CS->Add(lTemp, sizeof(stLocation));	//full location
 	mTemp.moveCount = woMyself->GetAnimCount();	//f74c count;
 	CS->Add(&mTemp, sizeof(stMoveInfo));	//movement info
-	CS->Add((DWORD) 1);				//?	also seen as 0 for just position updates...
+	CS->Add((DWORD) 1);		// contact with ground
 	SendWSGameEvent(CS, 5);	// XXX: prev comment was: "definitely group 5"
 }
 

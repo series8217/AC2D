@@ -33,7 +33,7 @@ cInterface::cInterface()
     m_MotionControlsState.walk = false;
     m_MotionControlsState.autoRun = false;
 
-	bAnimUpdate = false;
+	bMotionUpdate = false;
 
     // XXX: get this from character stats?
 	fSpeed = 32;
@@ -446,9 +446,9 @@ int cInterface::Draw(RECT rRect, HDC hDC)
         }
 	}
 
-	if (bAnimUpdate)
+	if (bMotionUpdate)
 	{
-		bAnimUpdate = false;
+		bMotionUpdate = false;
 
 		int iFB = 0, iStrafe = 0, iTurn = 0;
 
@@ -465,7 +465,7 @@ int cInterface::Draw(RECT rRect, HDC hDC)
 		if (m_MotionControlsState.sidestepRight)
 			iStrafe++;
 
-		m_Network->SendAnimUpdate(iFB, iStrafe, iTurn, !m_MotionControlsState.walk);
+		m_Network->SendMoveUpdate(iFB, iStrafe, iTurn, !m_MotionControlsState.walk);
 
 		//Update velocity info
         // XXX: should this be before UpdateObjects and SendPositionUpdate????
@@ -1089,32 +1089,32 @@ bool cInterface::OnKeyUp( IWindow & Window, unsigned long KeyCode )
 	if (KeyCode == 'W')
 	{
         m_MotionControlsState.forward = false;
-		bAnimUpdate = true;
+		bMotionUpdate = true;
 	}
 	if (KeyCode == 'X')
 	{
         m_MotionControlsState.backward = false;
-		bAnimUpdate = true;
+		bMotionUpdate = true;
 	}
 	if (KeyCode == 'A')
 	{
         m_MotionControlsState.turnLeft = false;
-		bAnimUpdate = true;
+		bMotionUpdate = true;
 	}
 	if (KeyCode == 'D')
 	{
         m_MotionControlsState.turnRight = false;
-		bAnimUpdate = true;
+		bMotionUpdate = true;
 	}
 	if (KeyCode == 'Z')
 	{
         m_MotionControlsState.sidestepLeft = false;
-		bAnimUpdate = true;
+		bMotionUpdate = true;
 	}
 	if (KeyCode == 'C')
 	{
         m_MotionControlsState.sidestepRight = false;
-		bAnimUpdate = true;
+		bMotionUpdate = true;
 	}
 	if (KeyCode == 'F') // cycle through speed scaling
 	{
@@ -1213,7 +1213,7 @@ bool cInterface::OnKeyDown( IWindow & Window, unsigned long KeyCode )
 		if (!m_MotionControlsState.forward)
 		{
             m_MotionControlsState.forward = true;
-			bAnimUpdate = true;
+			bMotionUpdate = true;
 		}
 	}
 
@@ -1222,7 +1222,7 @@ bool cInterface::OnKeyDown( IWindow & Window, unsigned long KeyCode )
 		if (!m_MotionControlsState.backward)
 		{
             m_MotionControlsState.backward = true;
-			bAnimUpdate = true;
+			bMotionUpdate = true;
 		}
 	}
 
@@ -1231,7 +1231,7 @@ bool cInterface::OnKeyDown( IWindow & Window, unsigned long KeyCode )
 		if (!m_MotionControlsState.turnLeft)
 		{
             m_MotionControlsState.turnLeft = true;
-			bAnimUpdate = true;
+			bMotionUpdate = true;
 		}
 	}
 
@@ -1240,7 +1240,7 @@ bool cInterface::OnKeyDown( IWindow & Window, unsigned long KeyCode )
 		if (!m_MotionControlsState.turnRight)
 		{
             m_MotionControlsState.turnRight = true;
-			bAnimUpdate = true;
+			bMotionUpdate = true;
 		}
 	}
 
@@ -1249,7 +1249,7 @@ bool cInterface::OnKeyDown( IWindow & Window, unsigned long KeyCode )
 		if (!m_MotionControlsState.sidestepLeft)
 		{
             m_MotionControlsState.sidestepLeft = true;
-			bAnimUpdate = true;
+			bMotionUpdate = true;
 		}
 	}
 
@@ -1258,7 +1258,7 @@ bool cInterface::OnKeyDown( IWindow & Window, unsigned long KeyCode )
 		if (!m_MotionControlsState.sidestepRight)
 		{
             m_MotionControlsState.sidestepRight = true;
-			bAnimUpdate = true;
+			bMotionUpdate = true;
 		}
 	}
 
