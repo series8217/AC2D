@@ -4,7 +4,7 @@
 #include "cMessage.h"
 #include "cInterface.h"
 #include "cThread.h"
-#include "cObjectDB.h"
+#include "cWorld.h"
 #include "cCharInfo.h"
 #include "ChecksumXorGenerator.h"
 
@@ -147,7 +147,7 @@ public:
 	~cNetwork();
 
 	void SetInterface(cInterface *Interface);
-	void SetObjectDB(cObjectDB *ObjectDB);
+	void SetWorld(cWorld *World);
 	void SetCharInfo(cCharInfo *CharInfo);
 
 	void SendLSGameEvent(cPacket *Packet, WORD wGroup);
@@ -212,7 +212,7 @@ private:
     void SendConnectResponse();
 	
 	cInterface *m_Interface;
-	cObjectDB *m_ObjectDB;
+	cWorld *m_World;
 	cCharInfo *m_CharInfo;
 
 	WORD GetTime();

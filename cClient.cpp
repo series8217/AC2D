@@ -31,12 +31,12 @@ cClient::~cClient()
 	while (!m_Network->GetStopped())
 		Sleep(1);
 
-	delete m_ObjectDB;
 	delete m_CharInfo;
 	delete m_Interface;
 	delete m_Graphics;
 	delete m_Network;
 	delete m_Portal;
+    delete m_World;
 }
 
 void cClient::Run()
@@ -44,7 +44,7 @@ void cClient::Run()
 	//Initialize Classes
 	m_Graphics = new cGraphics(m_hWnd);
 	m_Interface = new cInterface();
-	m_ObjectDB = new cObjectDB();
+    m_World = new cWorld();
 	m_CharInfo = new cCharInfo();
 	m_Network = new cNetwork();
 
@@ -56,11 +56,13 @@ void cClient::Run()
 	m_Network->SetInterface(m_Interface);
 	m_Graphics->SetInterface(m_Interface);
 
-	//Setup ObjectDB interfaces
-	m_Interface->SetObjectDB(m_ObjectDB);
-	m_Network->SetObjectDB(m_ObjectDB);
+	
 	m_Interface->SetCharInfo(m_CharInfo);
 	m_Network->SetCharInfo(m_CharInfo);
+
+    //Setup world object interfaces
+    m_Interface->SetWorld(m_World);
+    m_Network->SetWorld(m_World);
 
 	//Start the connection
 #ifndef TerrainOnly

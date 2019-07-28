@@ -976,7 +976,7 @@ public:
 	cRadar()
 	{
 		m_fRange = 0.3f;
-		m_ObjectDB = 0;
+		m_World = 0;
 
 		m_RadarBG.SetPicture(0x06004CC1);
 //		m_RadarBG.SetVisible(true);
@@ -993,9 +993,9 @@ public:
 	~cRadar()
 	{
 	}
-	void SetObjectDB(cObjectDB *ObjectDB)
+	void SetWorld(cWorld *World)
 	{
-		m_ObjectDB = ObjectDB;
+		m_World = World;
 	}
 	void SetChar(DWORD Char)
 	{
@@ -1011,15 +1011,15 @@ public:
 			iHeight = m_wClientArea.GetHeight();
 
 		//icons
-		cWObject *woMyself = m_ObjectDB->FindObject(m_dwChar);
+		cWObject *woMyself = m_World->FindObject(m_dwChar);
 		if (woMyself)
 		{
-			m_ObjectDB->Lock();
+			m_World->Lock();
  			cPoint3D p3dMyself = woMyself->GetPosition();
 			float fHead = woMyself->GetHeading();
-			m_ObjectDB->Unlock();
-			std::list<cWObject *> * SortList = m_ObjectDB->GetObjectsWithin(p3dMyself, m_fRange);
-			m_ObjectDB->Lock();
+			m_World->Unlock();
+			std::list<cWObject *> * SortList = m_World->GetObjectsWithin(p3dMyself, m_fRange);
+			m_World->Lock();
 			float fMaxDist = 100.0f;
 			DWORD dwClosest = 0;
 			for (std::list<cWObject *>::iterator i = SortList->begin(); i != SortList->end(); i++)
@@ -1063,7 +1063,7 @@ public:
 					glVertex2f(ptF.x - 1, ptF.y + 1);
 				glEnd();
 			}
-			m_ObjectDB->Unlock();
+			m_World->Unlock();
 			delete SortList;
 		}
 
@@ -1072,7 +1072,7 @@ public:
 
 private:
 	float m_fRange;
-	cObjectDB *m_ObjectDB;
+	cWorld *m_World;
 	DWORD m_dwChar;
 	cPictureBox m_RadarBG;
 

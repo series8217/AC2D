@@ -1,10 +1,9 @@
 #pragma once
 #include "cThread.h"
-#include "cObjectDB.h"
 #include "cCharInfo.h"
 #include "WindowLib/cWindowManager.h"
 #include "cCellManager.h"
-#include "Landblocks.h"
+#include "cWorld.h"
 
 //widgets
 #include "cProgressBar.h"
@@ -47,8 +46,8 @@ public:
 	cInterface();
 	~cInterface();
 	void SetNetwork(cNetwork *Network);
-	void SetObjectDB(cObjectDB *ObjectDB);
 	void SetCharInfo(cCharInfo *CharInfo);
+    void SetWorld(cWorld *World);
 	
 	void WindowsMessage(UINT Message, WPARAM wParam, LPARAM lParam);
 
@@ -83,8 +82,6 @@ public:
 
 //	void SetStance(WORD NewStance);
 
-	void AddLandblock(cPortalFile *NewLB);
-
 	DWORD GetCurrentSelection();
 
 private:
@@ -101,8 +98,6 @@ private:
 	bool KeyboardEventsAbstractor< cInterface >::OnKeyUp( IWindow & Window, unsigned long KeyCode );
 	bool RenderEventAbstractor< cInterface >::OnRender( IWindow & Window, double TimeSlice );
 
-	void LoadLandblocks();
-	bool FindLandblocks(FILE *cell, DWORD dirPos);
 	void DrawLandblockFFFF(DWORD Landblock);
 	void DrawLandblockFFFE(DWORD Landblock);
 
@@ -111,8 +106,8 @@ private:
 	void ParseEditInput( std::string &szInput );
 
 	cNetwork *m_Network;
-	cObjectDB *m_ObjectDB;
 	cCharInfo *m_CharInfo;
+    cWorld *m_World;
 
 	//main display interface stuff
 	eInterfaceMode m_InterfaceMode;
@@ -161,9 +156,6 @@ private:
 
 	float fSpeed;
     bool bMotionUpdate;
-
-	std::map<WORD, cLandblock *> m_mLandblocks;
-	std::unordered_set<WORD> m_mCurrentLandblocks, m_mNeedToLoadBlocks, m_mDownloadingLandblocks;
 
 	LARGE_INTEGER liFreq, liLast;
 

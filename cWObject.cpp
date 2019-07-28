@@ -68,7 +68,6 @@ void cWObject::UpdatePosition(float fTimeDiff)
 	Lock();
 	if (m_bMoving)
 	{
-        // XXX: Velocity is never set, so this doesn't seem to have any purpose
 		CalcPosition += Velocity*fTimeDiff;
 
 		//Turning...
@@ -98,11 +97,15 @@ void cWObject::UpdatePosition(float fTimeDiff)
         location.xOffset -= -sin(fCurHeading + 0.5*M_PI)*fVelocityStrafe*fTimeDiff;
         location.yOffset += -cos(fCurHeading + 0.5*M_PI)*fVelocityStrafe*fTimeDiff;
 
+        // TODO: correct the Z position to follow the ground
+        // get the current landblock
+        
+
         //XXX: stLocation *lPlayer = woMyself->GetLocation();
-//XXX: stMoveInfo mPlayer = woMyself->GetMoveInfo();
-//XXX: float fPlayerHeading = woMyself->GetHeading();
-//XXX: lPlayer->xOffset -= -sin(fPlayerHeading);
-//XXX: lPlayer->yOffset += -cos(fPlayerHeading);
+        //XXX: stMoveInfo mPlayer = woMyself->GetMoveInfo();
+        //XXX: float fPlayerHeading = woMyself->GetHeading();
+        //XXX: lPlayer->xOffset -= -sin(fPlayerHeading);
+        //XXX: lPlayer->yOffset += -cos(fPlayerHeading);
 
 		CalcHeading();
 	}

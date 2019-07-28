@@ -241,9 +241,6 @@ cInterface::~cInterface()
 {
 	DeleteCriticalSection(&csChat);
 
-	for (std::map<WORD, cLandblock *>::iterator i = m_mLandblocks.begin(); i != m_mLandblocks.end(); i++)
-		delete i->second;
-
 	//Clean up UI
 	RemoveChild(*m_mwMinimap);
 	delete m_mwMinimap;
@@ -288,13 +285,6 @@ void cInterface::SetNetwork(cNetwork *Network)
 	m_Network = Network;
 }
 
-void cInterface::SetObjectDB(cObjectDB *ObjectDB)
-{
-	m_ObjectDB = ObjectDB;
-
-	m_mwRadar->SetObjectDB(m_ObjectDB);
-}
-
 void cInterface::SetCharInfo(cCharInfo *CharInfo)
 {
 	m_CharInfo = CharInfo;
@@ -303,6 +293,11 @@ void cInterface::SetCharInfo(cCharInfo *CharInfo)
 	m_mwStats->SetCharInfo(CharInfo);
 	m_mwSkills->SetCharInfo(CharInfo);
 	m_mwSpellBar->SetCharInfo(CharInfo);
+}
+
+void cInterface::SetWorld(cWorld *World) {
+    m_World = World;
+    m_mwRadar->SetWorld(m_World);
 }
 
 void cInterface::OutputConsoleString(char *format, ...)
@@ -373,30 +368,6 @@ void cInterface::SetConnProgress(float NewProgress)
 //	Unlock();
 }
 
-void cInterface::LoadLandblocks()
-{
-//	OutputString(eYellow, "Loading Landblocks...");
-	
-	for (std::unordered_set<WORD>::iterator i = m_mNeedToLoadBlocks.begin(); i != m_mNeedToLoadBlocks.end(); i++)
-	{
-		cLandblock *pLB = new cLandblock();
-		pLB->Load(*i);
-		m_mLandblocks[*i] = pLB;
-	}
-
-	m_mNeedToLoadBlocks.clear();
-
-//	OutputString(eYellow, "Done Loading.");
-}
-
-void cInterface::AddLandblock(cPortalFile *NewLB)
-{
-	Lock();
-	m_Cell->InsertEntry(NewLB);
-	m_mNeedToLoadBlocks.insert(NewLB->id >> 16);
-	Unlock();
-}
-
 int cInterface::Draw(RECT rRect, HDC hDC)
 {
 	DispatchMessages();
@@ -410,8 +381,12 @@ int cInterface::Draw(RECT rRect, HDC hDC)
 	float fTimeDiff = (float) (liTemp.QuadPart - liLast.QuadPart)/liFreq.QuadPart;
 	liLast = liTemp;
 
+    if (m_World == NULL) {
+
+    }
+
     // update positions of objects (this include updating character position based on control inputs)
-	m_ObjectDB->UpdateObjects(fTimeDiff);
+	m_World->UpdateObjects(fTimeDiff);
 
 	//check for message sending
 	//XXX: nuke this asap...
@@ -438,7 +413,7 @@ int cInterface::Draw(RECT rRect, HDC hDC)
 
         // send new player position if we haven't in the last LOCATION_UPDATE_INTERVAL_MS
         if (m_dwLastLocationUpdate + LOCATION_UPDATE_INTERVAL_MS < GetTickCount()) {
-            cWObject *woMyself = m_ObjectDB->FindObject(m_dwSelChar);
+            cWObject *woMyself = m_World->FindObject(m_dwSelChar);
             if (woMyself) {
                 m_Network->SendPositionUpdate(woMyself->GetLocation(), &woMyself->GetMoveInfo());
             }
@@ -469,10 +444,10 @@ int cInterface::Draw(RECT rRect, HDC hDC)
 
 		//Update velocity info
         // XXX: should this be before UpdateObjects and SendPositionUpdate????
-		cWObject *woMyself = m_ObjectDB->FindObject(m_dwSelChar);
+		cWObject *woMyself = m_World->FindObject(m_dwSelChar);
 		if (woMyself)
 		{
-            m_ObjectDB->Lock();
+            m_World->Lock();
 			woMyself->SetMoveVelocities(iFB*3.0f, iStrafe*-1.0f, iTurn*1.5f);
             // process movement to update Location (not the same as Position -- Location is shared /w server!)
             //XXX: stLocation *lPlayer = woMyself->GetLocation();
@@ -480,7 +455,7 @@ int cInterface::Draw(RECT rRect, HDC hDC)
             //XXX: float fPlayerHeading = woMyself->GetHeading();
             //XXX: lPlayer->xOffset -= -sin(fPlayerHeading);
             //XXX: lPlayer->yOffset += -cos(fPlayerHeading);
-            m_ObjectDB->Unlock();
+            m_World->Unlock();
 		}
 	}
 
@@ -986,7 +961,7 @@ bool cInterface::OnMouseDown( IWindow & Window, float X, float Y, unsigned long 
 
 	if (m_InterfaceMode == eGame)
 	{
-		cWObject *woMyself = m_ObjectDB->FindObject(m_dwSelChar);
+		cWObject *woMyself = m_World->FindObject(m_dwSelChar);
 		cPoint3D MyPos;
 		float fMyHead = 0;
 		if (woMyself)
@@ -1028,8 +1003,8 @@ bool cInterface::OnMouseDown( IWindow & Window, float X, float Y, unsigned long 
 
 		gluLookAt(CamLoc.x, CamLoc.y, CamLoc.z + MODEL_SCALE_FACTOR, MyPos.x, MyPos.y, MyPos.z + MODEL_SCALE_FACTOR, CamUp.x, CamUp.y, CamUp.z);
 
-		m_ObjectDB->Lock();
-		std::list<cWObject *> * DrawList = m_ObjectDB->GetObjectsWithin(MyPos, 3.3f);
+		m_World->Lock();
+		std::list<cWObject *> * DrawList = m_World->GetObjectsWithin(MyPos, 3.3f);
 
 		for (std::list<cWObject *>::iterator i = DrawList->begin(); i != DrawList->end(); i++)
 		{
@@ -1039,7 +1014,7 @@ bool cInterface::OnMouseDown( IWindow & Window, float X, float Y, unsigned long 
 		}
 
 		delete DrawList;
-		m_ObjectDB->Unlock();
+		m_World->Unlock();
 
 		glFlush();
 
@@ -1173,14 +1148,14 @@ bool cInterface::OnKeyDown( IWindow & Window, unsigned long KeyCode )
 	{
 		if (m_InterfaceMode == eGame)
 		{
-			cWObject *woMyself = m_ObjectDB->FindObject(m_dwSelChar);
+			cWObject *woMyself = m_World->FindObject(m_dwSelChar);
 			if (woMyself)
 			{
-				m_ObjectDB->Lock();
+				m_World->Lock();
  				cPoint3D p3dMyself = woMyself->GetPosition();
-				m_ObjectDB->Unlock();
-				std::list<cWObject *> * SortList = m_ObjectDB->GetObjectsWithin(p3dMyself, 0.3f);
-				m_ObjectDB->Lock();
+				m_World->Unlock();
+				std::list<cWObject *> * SortList = m_World->GetObjectsWithin(p3dMyself, 0.3f);
+				m_World->Lock();
 				float fMaxDist = 100.0f;
 				DWORD dwClosest = 0;
 				for (std::list<cWObject *>::iterator i = SortList->begin(); i != SortList->end(); i++)
@@ -1197,7 +1172,7 @@ bool cInterface::OnKeyDown( IWindow & Window, unsigned long KeyCode )
 					}
 				}
 				m_dwCurSelect = dwClosest;
-				m_ObjectDB->Unlock();
+				m_World->Unlock();
 				delete SortList;
 			}
 		}
@@ -1706,7 +1681,7 @@ bool cInterface::OnRender( IWindow & Window, double TimeSlice )
 		glLoadIdentity();
 		gluPerspective(90,(float)m_iWidth/m_iHeight, 0.001, 100);
 
-		cWObject *woMyself = m_ObjectDB->FindObject(m_dwSelChar);
+		cWObject *woMyself = m_World->FindObject(m_dwSelChar);
 		cPoint3D MyPos;
 		float fMyHead = 0;
 		if (woMyself)
@@ -1742,43 +1717,22 @@ bool cInterface::OnRender( IWindow & Window, double TimeSlice )
 			woMyself->Lock();
 			DWORD dwCurLB = woMyself->GetLandblock();
 			woMyself->Unlock();
-			DWORD LBX = (dwCurLB >> 24) & 0xFF;
-			DWORD LBY = (dwCurLB >> 16) & 0xFF;
+            // load landblocks within draw radius
+            m_World->LoadLandblocks(dwCurLB, m_iRenderRadius);
 
-			m_mCurrentLandblocks.clear();
-			int Y1 = LBY-m_iRenderRadius, Y2 = LBY+m_iRenderRadius;
-			if (Y1 < 0) Y1 = 0;	if (Y2 > 255) Y2 = 255;
-			int X1 = LBX-m_iRenderRadius, X2 = LBX+m_iRenderRadius;
-			if (X1 < 0) X1 = 0;	if (X2 > 255) X2 = 255;
-			for (DWORD y=Y1;y<=(DWORD)Y2;y++)
-			{
-				for (DWORD x=X1;x<=(DWORD)X2;x++)
-				{
-					WORD wLB = (x << 8) | y;
-					m_mCurrentLandblocks.insert(wLB);
-					if (m_mLandblocks.find(wLB) == m_mLandblocks.end())
-						if (m_mDownloadingLandblocks.find(wLB) == m_mDownloadingLandblocks.end())
-							m_mNeedToLoadBlocks.insert(wLB);
-				}
-			}
+            std::unordered_set<WORD>::iterator i = m_World->GetIterCurrentLandblocks();
+            cLandblock *pLB = m_World->GetNextLandblock(i);
+            while (pLB != NULL) {
+                m_iTriCount += pLB->Draw();
+                pLB = m_World->GetNextLandblock(i);
+            }
 
-			if (m_mNeedToLoadBlocks.size())
-				LoadLandblocks();
-
-			for (std::unordered_set<WORD>::iterator i = m_mCurrentLandblocks.begin(); i != m_mCurrentLandblocks.end(); i++)
-			{
-				if (m_mLandblocks.find(*i) != m_mLandblocks.end())
-				{
-					cLandblock *pLB = m_mLandblocks.find(*i)->second;
-					m_iTriCount += pLB->Draw();
-				}
-			}
 		}
 
 		//draw all objects
-		m_ObjectDB->Lock();
+		m_World->Lock();
 
-		std::list<cWObject *> * DrawList = m_ObjectDB->GetObjectsWithin(MyPos, 3.3f);
+		std::list<cWObject *> * DrawList = m_World->GetObjectsWithin(MyPos, 3.3f);
 
 		QueryPerformanceCounter(&tpt2);
 
@@ -1828,7 +1782,7 @@ bool cInterface::OnRender( IWindow & Window, double TimeSlice )
 		double ftp2 = (tpt3.QuadPart - tpt2.QuadPart)/(double) tpf.QuadPart;
 
 		delete DrawList;
-		m_ObjectDB->Unlock();
+		m_World->Unlock();
 
 		glBindTexture( GL_TEXTURE_2D, 0);
 

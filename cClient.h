@@ -1,7 +1,7 @@
 #pragma once
 
 #include "cCharInfo.h"
-#include "cObjectDB.h"
+#include "cWorld.h"
 #include "cInterface.h"
 #include "cGraphics.h"
 #include "cNetwork.h"
@@ -21,10 +21,10 @@ private:
 
 	bool m_bInit;
 
-	cObjectDB *m_ObjectDB;
 	cCharInfo *m_CharInfo;
 	cInterface *m_Interface;
 	cGraphics *m_Graphics;
 	cNetwork *m_Network;
+    cWorld *m_World;
 
 };

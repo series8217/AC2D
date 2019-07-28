@@ -130,222 +130,250 @@ void cLandblock::Load(WORD wBlock)
 	DWORD dwLB = ((DWORD) m_wBlock) << 16;
 
 	//First load the FFFF
-	cPortalFile *pfFFFF = m_Cell->OpenEntry(dwLB | 0xFFFF);
-	if (!pfFFFF)
+	cPortalFile *portalFileLandblockCell = m_Cell->OpenEntry(dwLB | 0xFFFF);
+	if (!portalFileLandblockCell)
 	{
-		//Add request mechanism here...
-		ZeroMemory(&m_lbFFFF, sizeof(stLandblockFFFF));
+		// TODO: Add request mechanism here...
+		ZeroMemory(&m_lbCell, sizeof(stLandblockCell));
 		return;
 	}
 	
-	//Fill in FFFF structure
-	memcpy(&m_lbFFFF, pfFFFF->data, sizeof(stLandblockFFFF));
+	//Fill in landblock cell structure
+	memcpy(&m_lbCell, portalFileLandblockCell->data, sizeof(stLandblockCell));
+
+    // calculate vertices
+    updateVertexHeights();
 
 	//If applicable, load object block
-	if (m_lbFFFF.dwObjectBlock)	//1 for block, 0 for none
+	if (m_lbCell.dwObjectBlock)	//1 for block, 0 for none
 	{
-		//Now load the FFFE
-		cPortalFile *pfFFFE = m_Cell->OpenEntry(dwLB | 0xFFFE);
-		if (!pfFFFE)
-		{
-			//Add request mechanism here...
-			return;
-		}
-
-		cByteStream pBS(pfFFFE->data, pfFFFE->length);
-
-		pBS.ReadBegin();
-		DWORD dwID = pBS.ReadDWORD();
-
-		DWORD iNumCells = pBS.ReadDWORD();
-		for (DWORD j=0;j<iNumCells;j++)
-		{
-			//Read the cells (0xYYXX01xx
-			DWORD pfID = (dwLB | 0x0100) + j;
-			cPortalFile *pfTemp = m_Cell->OpenEntry(pfID);
-			if (!pfTemp)
-				continue;
-
-			cByteStream pBS2(pfTemp->data, pfTemp->length);
-			pBS2.ReadBegin();
-
-			pBS2.ReadDWORD();	//ID
-			DWORD dwCellFlags = pBS2.ReadDWORD();
-			pBS2.ReadDWORD(); //ID again for some reason
-
-			BYTE bTexCount = pBS2.ReadByte();	//Num of words below
-			BYTE bConnCount = pBS2.ReadByte();	//2x this = number of extra DWORDs down below
-			WORD wVisCount = pBS2.ReadWORD();
-
-			std::vector<WORD> vTexes;
-			vTexes.clear();
-			//These are texture refs for the dungeonpart
-			for (int i=0; i<bTexCount; i++)
-				vTexes.push_back(pBS2.ReadWORD());
-
-			DWORD DungeonRef = 0x0D000000 | pBS2.ReadWORD();	//Dungeon Ref
-			WORD DungeonPart = pBS2.ReadWORD();	//Which part of the dungeon ref it needs
-
-			stLocation tpld;
-			tpld.xOffset = pBS2.ReadFloat();
-			tpld.yOffset = pBS2.ReadFloat();
-			tpld.zOffset = pBS2.ReadFloat();
-			tpld.wHeading = pBS2.ReadFloat();
-			tpld.aHeading = pBS2.ReadFloat();
-			tpld.bHeading = pBS2.ReadFloat();
-			tpld.cHeading = pBS2.ReadFloat();
-			tpld.landblock = dwLB;
-			cPoint3D tp3d;
-			tp3d.CalcFromLocation(&tpld);
-
-			cModelGroup *DModel = new cModelGroup();
-            if (!DModel->ReadDungeon(DungeonRef, DungeonPart, &vTexes))
-            {
-                return;
-            }
-			DModel->SetScale(MODEL_SCALE_FACTOR);
-			DModel->SetTranslation(tp3d);
-			DModel->SetRotation(tpld.wHeading, tpld.aHeading, tpld.bHeading, tpld.cHeading);
-			Models.push_back(DModel);
-
-			//Kewt says this is connections to adjascent cells
-			for (int i=0; i<bConnCount; i++)
-			{
-				pBS2.ReadWORD();	//Type
-				pBS2.ReadWORD();	//Face
-				pBS2.ReadWORD();	//Block
-				pBS2.ReadWORD();	//Unknown
-			}
-
-			//List of visible cells from this cell
-			for (int i=0; i<wVisCount; i++)
-				pBS2.ReadWORD();
-
-			if (dwCellFlags & 1)
-			{
-				//?...
-			}
-
-			if (dwCellFlags & 2)
-			{
-				//models!
-				DWORD dwModelCount = pBS2.ReadDWORD();
-
-				for (int i=0; i<(int)dwModelCount; i++)
-				{
-					DWORD dwModelID = pBS2.ReadDWORD();
-					stLocation tpl;
-					tpl.xOffset = pBS2.ReadFloat();
-					tpl.yOffset = pBS2.ReadFloat();
-					tpl.zOffset = pBS2.ReadFloat();
-					tpl.wHeading = pBS2.ReadFloat();
-					tpl.aHeading = pBS2.ReadFloat();
-					tpl.bHeading = pBS2.ReadFloat();
-					tpl.cHeading = pBS2.ReadFloat();
-					tpl.landblock = dwLB;
-					cPoint3D tp3d;
-					tp3d.CalcFromLocation(&tpl);
-
-					cModelGroup *Model = new cModelGroup();
-					if (!Model->ReadModel(dwModelID))
-					{
-                        return;
-//			OutputString(eRed, "Failed model load: %08X", m_lbFFFE.Objects[j].dwID);
-//				OutputConsoleString("Failed model load: %08X", dwModelID);
-					}
-					Model->SetScale(MODEL_SCALE_FACTOR);
-					Model->SetTranslation(tp3d);
-					Model->SetRotation(tpl.wHeading, tpl.aHeading, tpl.bHeading, tpl.cHeading);
-					Models.push_back(Model);
-				}
-			}
-			
-			if (dwCellFlags & 8)
-			{
-				pBS2.ReadDWORD();	//? - 7D2221A0
-			}
-		}
-
-		DWORD iNumObjects = pBS.ReadDWORD();
-		for (DWORD j=0;j<iNumObjects;j++)
-		{
-			DWORD dwModelID = pBS.ReadDWORD();
-			stLocation tpl;
-			tpl.xOffset = pBS.ReadFloat();
-			tpl.yOffset = pBS.ReadFloat();
-			tpl.zOffset = pBS.ReadFloat();
-			tpl.wHeading = pBS.ReadFloat();
-			tpl.aHeading = pBS.ReadFloat();
-			tpl.bHeading = pBS.ReadFloat();
-			tpl.cHeading = pBS.ReadFloat();
-			tpl.landblock = dwLB;
-			cPoint3D tp3d;
-			tp3d.CalcFromLocation(&tpl);
-
-			cModelGroup *Model = new cModelGroup();
-			if (!Model->ReadModel(dwModelID))
-			{
-                return;
-                //			OutputString(eRed, "Failed model load: %08X", m_lbFFFE.Objects[j].dwID);
-//				OutputConsoleString("Failed model load: %08X", dwModelID);
-			}
-			Model->SetScale(MODEL_SCALE_FACTOR);
-			Model->SetTranslation(tp3d);
-			Model->SetRotation(tpl.wHeading, tpl.aHeading, tpl.bHeading, tpl.cHeading);
-			Models.push_back(Model);
-		}
-
-		WORD wNumSkins = pBS.ReadWORD();
-		WORD wSkinUnknown = pBS.ReadWORD();
-		for (int j = 0; j < wNumSkins; j++) 
-		{
-			DWORD dwModelID = pBS.ReadDWORD();
-			stLocation tpl;
-			tpl.xOffset = pBS.ReadFloat();
-			tpl.yOffset = pBS.ReadFloat();
-			tpl.zOffset = pBS.ReadFloat();
-			tpl.wHeading = pBS.ReadFloat();
-			tpl.aHeading = pBS.ReadFloat();
-			tpl.bHeading = pBS.ReadFloat();
-			tpl.cHeading = pBS.ReadFloat();
-			tpl.landblock = dwLB;
-			cPoint3D tp3d;
-			tp3d.CalcFromLocation(&tpl);
-
-			cModelGroup *Model = new cModelGroup();
-			if (!Model->ReadModel(dwModelID))
-			{
-                return;
-                //			OutputString(eRed, "Failed model load: %08X", dwModelID);
-//				OutputConsoleString("Failed model load: %08X", dwModelID);
-			}
-			Model->SetScale(MODEL_SCALE_FACTOR);
-			Model->SetTranslation(tp3d);
-			Model->SetRotation(tpl.wHeading, tpl.aHeading, tpl.bHeading, tpl.cHeading);
-			Models.push_back(Model);
-
-			//Skip the strange data 
-			DWORD unknown1 = pBS.ReadDWORD();
-			DWORD dwWeirdCount = pBS.ReadDWORD();
-			for (DWORD k = 0; k < dwWeirdCount; k++) 
-			{ 
-				DWORD dwUnk1 = pBS.ReadDWORD();
-				WORD wUnk1 = pBS.ReadWORD();
-				WORD wTableCount = pBS.ReadWORD();
-				for (int l = 0; l < wTableCount; l++)
-				{
-					WORD wUnk2 = pBS.ReadWORD();
-				}
-				if (wTableCount & 1)
-					pBS.ReadWORD();
-			} 
-		} 
+        LoadObjectBlock(&dwLB);
 	}
 }
 
-bool cLandblock::FSplitNESW(DWORD x, DWORD y)
+void cLandblock::updateVertexHeights() {
+
+    for (int y = 0;y < VERTEXDIM; y++)
+    {
+        for (int x = 0;x < VERTEXDIM; x++)
+        {
+            // TODO: look up and apply scaling factor in land height table from portal dat
+            vertexHeights[x][y] = m_lbCell.bZ[x][y];
+        }
+    }
+}
+
+void cLandblock::LoadObjectBlock(DWORD *dwLB) {
+    //Now load the FFFE
+    cPortalFile *pfFFFE = m_Cell->OpenEntry(*dwLB | 0xFFFE);
+    if (!pfFFFE)
+    {
+        //Add request mechanism here...
+        return;
+    }
+
+    cByteStream pBS(pfFFFE->data, pfFFFE->length);
+
+    pBS.ReadBegin();
+    DWORD dwID = pBS.ReadDWORD();
+
+    DWORD iNumCells = pBS.ReadDWORD();
+    for (DWORD j = 0;j < iNumCells;j++)
+    {
+        //Read the cells (0xYYXX01xx
+        DWORD pfID = (*dwLB | 0x0100) + j;
+        cPortalFile *pfTemp = m_Cell->OpenEntry(pfID);
+        if (!pfTemp)
+            continue;
+
+        cByteStream pBS2(pfTemp->data, pfTemp->length);
+        pBS2.ReadBegin();
+
+        pBS2.ReadDWORD();	//ID
+        DWORD dwCellFlags = pBS2.ReadDWORD();
+        pBS2.ReadDWORD(); //ID again for some reason
+
+        BYTE bTexCount = pBS2.ReadByte();	//Num of words below
+        BYTE bConnCount = pBS2.ReadByte();	//2x this = number of extra DWORDs down below
+        WORD wVisCount = pBS2.ReadWORD();
+
+        std::vector<WORD> vTexes;
+        vTexes.clear();
+        //These are texture refs for the dungeonpart
+        for (int i = 0; i < bTexCount; i++)
+            vTexes.push_back(pBS2.ReadWORD());
+
+        DWORD DungeonRef = 0x0D000000 | pBS2.ReadWORD();	//Dungeon Ref
+        WORD DungeonPart = pBS2.ReadWORD();	//Which part of the dungeon ref it needs
+
+        stLocation tpld;
+        tpld.xOffset = pBS2.ReadFloat();
+        tpld.yOffset = pBS2.ReadFloat();
+        tpld.zOffset = pBS2.ReadFloat();
+        tpld.wHeading = pBS2.ReadFloat();
+        tpld.aHeading = pBS2.ReadFloat();
+        tpld.bHeading = pBS2.ReadFloat();
+        tpld.cHeading = pBS2.ReadFloat();
+        tpld.landblock = *dwLB;
+        cPoint3D tp3d;
+        tp3d.CalcFromLocation(&tpld);
+
+        cModelGroup *DModel = new cModelGroup();
+        if (!DModel->ReadDungeon(DungeonRef, DungeonPart, &vTexes))
+        {
+            return;
+        }
+        DModel->SetScale(MODEL_SCALE_FACTOR);
+        DModel->SetTranslation(tp3d);
+        DModel->SetRotation(tpld.wHeading, tpld.aHeading, tpld.bHeading, tpld.cHeading);
+        Models.push_back(DModel);
+
+        //Kewt says this is connections to adjascent cells
+        for (int i = 0; i < bConnCount; i++)
+        {
+            pBS2.ReadWORD();	//Type
+            pBS2.ReadWORD();	//Face
+            pBS2.ReadWORD();	//Block
+            pBS2.ReadWORD();	//Unknown
+        }
+
+        //List of visible cells from this cell
+        for (int i = 0; i < wVisCount; i++)
+            pBS2.ReadWORD();
+
+        if (dwCellFlags & 1)
+        {
+            //?...
+        }
+
+        if (dwCellFlags & 2)
+        {
+            //models!
+            DWORD dwModelCount = pBS2.ReadDWORD();
+
+            for (int i = 0; i < (int)dwModelCount; i++)
+            {
+                DWORD dwModelID = pBS2.ReadDWORD();
+                stLocation tpl;
+                tpl.xOffset = pBS2.ReadFloat();
+                tpl.yOffset = pBS2.ReadFloat();
+                tpl.zOffset = pBS2.ReadFloat();
+                tpl.wHeading = pBS2.ReadFloat();
+                tpl.aHeading = pBS2.ReadFloat();
+                tpl.bHeading = pBS2.ReadFloat();
+                tpl.cHeading = pBS2.ReadFloat();
+                tpl.landblock = *dwLB;
+                cPoint3D tp3d;
+                tp3d.CalcFromLocation(&tpl);
+
+                cModelGroup *Model = new cModelGroup();
+                if (!Model->ReadModel(dwModelID))
+                {
+                    return;
+                    //			OutputString(eRed, "Failed model load: %08X", m_lbFFFE.Objects[j].dwID);
+                    //				OutputConsoleString("Failed model load: %08X", dwModelID);
+                }
+                Model->SetScale(MODEL_SCALE_FACTOR);
+                Model->SetTranslation(tp3d);
+                Model->SetRotation(tpl.wHeading, tpl.aHeading, tpl.bHeading, tpl.cHeading);
+                Models.push_back(Model);
+            }
+        }
+
+        if (dwCellFlags & 8)
+        {
+            pBS2.ReadDWORD();	//? - 7D2221A0
+        }
+    }
+
+    DWORD iNumObjects = pBS.ReadDWORD();
+    for (DWORD j = 0;j < iNumObjects;j++)
+    {
+        DWORD dwModelID = pBS.ReadDWORD();
+        stLocation tpl;
+        tpl.xOffset = pBS.ReadFloat();
+        tpl.yOffset = pBS.ReadFloat();
+        tpl.zOffset = pBS.ReadFloat();
+        tpl.wHeading = pBS.ReadFloat();
+        tpl.aHeading = pBS.ReadFloat();
+        tpl.bHeading = pBS.ReadFloat();
+        tpl.cHeading = pBS.ReadFloat();
+        tpl.landblock = *dwLB;
+        cPoint3D tp3d;
+        tp3d.CalcFromLocation(&tpl);
+
+        cModelGroup *Model = new cModelGroup();
+        if (!Model->ReadModel(dwModelID))
+        {
+            return;
+            //			OutputString(eRed, "Failed model load: %08X", m_lbFFFE.Objects[j].dwID);
+//				OutputConsoleString("Failed model load: %08X", dwModelID);
+        }
+        Model->SetScale(MODEL_SCALE_FACTOR);
+        Model->SetTranslation(tp3d);
+        Model->SetRotation(tpl.wHeading, tpl.aHeading, tpl.bHeading, tpl.cHeading);
+        Models.push_back(Model);
+    }
+
+    WORD wNumSkins = pBS.ReadWORD();
+    WORD wSkinUnknown = pBS.ReadWORD();
+    for (int j = 0; j < wNumSkins; j++)
+    {
+        DWORD dwModelID = pBS.ReadDWORD();
+        stLocation tpl;
+        tpl.xOffset = pBS.ReadFloat();
+        tpl.yOffset = pBS.ReadFloat();
+        tpl.zOffset = pBS.ReadFloat();
+        tpl.wHeading = pBS.ReadFloat();
+        tpl.aHeading = pBS.ReadFloat();
+        tpl.bHeading = pBS.ReadFloat();
+        tpl.cHeading = pBS.ReadFloat();
+        tpl.landblock = *dwLB;
+        cPoint3D tp3d;
+        tp3d.CalcFromLocation(&tpl);
+
+        cModelGroup *Model = new cModelGroup();
+        if (!Model->ReadModel(dwModelID))
+        {
+            return;
+            //			OutputString(eRed, "Failed model load: %08X", dwModelID);
+//				OutputConsoleString("Failed model load: %08X", dwModelID);
+        }
+        Model->SetScale(MODEL_SCALE_FACTOR);
+        Model->SetTranslation(tp3d);
+        Model->SetRotation(tpl.wHeading, tpl.aHeading, tpl.bHeading, tpl.cHeading);
+        Models.push_back(Model);
+
+        //Skip the strange data 
+        DWORD unknown1 = pBS.ReadDWORD();
+        DWORD dwWeirdCount = pBS.ReadDWORD();
+        for (DWORD k = 0; k < dwWeirdCount; k++)
+        {
+            DWORD dwUnk1 = pBS.ReadDWORD();
+            WORD wUnk1 = pBS.ReadWORD();
+            WORD wTableCount = pBS.ReadWORD();
+            for (int l = 0; l < wTableCount; l++)
+            {
+                WORD wUnk2 = pBS.ReadWORD();
+            }
+            if (wTableCount & 1)
+                pBS.ReadWORD();
+        }
+    }
+}
+
+bool cLandblock::getSplitDirectionNESW(DWORD cellX, DWORD cellY)
 {
+    // get global tile offsets
+    DWORD dwBlockX = (m_lbCell.dwID & 0xff000000) >> 24;
+    DWORD dwBlockY = (m_lbCell.dwID & 0x00ff0000) >> 16;
+
+    DWORD x = (dwBlockX * 8) | cellX;
+    DWORD y = (dwBlockY * 8) | cellY;
+
+    /** Determines the split line direction for a cell triangulation */
 	DWORD dw = x * y * 0x0CCAC033 - x * 0x421BE3BD + y * 0x6C1AC587 - 0x519B8F25;
+    /* returns true if NE-SW split, FALSE if NW-SE split */
 	return (dw & 0x80000000) != 0;
 }
 
@@ -361,35 +389,39 @@ int cLandblock::Draw()
 
 	*/
 	//Draw the FFFF
-	float fXCorn, fYCorn;
-	DWORD dwBlockX = (m_lbFFFF.dwID & 0xff000000) >> 24;
-	DWORD dwBlockY = (m_lbFFFF.dwID & 0x00ff0000) >> 16;
+	float fXCorner, fYCorner;
+	DWORD dwBlockX = (m_lbCell.dwID & 0xff000000) >> 24;
+	DWORD dwBlockY = (m_lbCell.dwID & 0x00ff0000) >> 16;
 
 /*	if (dwBlockX < 3)
 	{
 		// dungeon, dwBlockX and dwBlockY remain constant - just use x and y
-		fXCorn = 0;
-		fYCorn = 0;
+		fXCorner = 0;
+		fYCorner = 0;
 	}
 	else*/
 	{
 		// outdoors
-		fXCorn = (float) ((((dwBlockX+1.00f) * 8.0f) - 1027.5) / 10.0f);
-		fYCorn = (float) ((((dwBlockY+1.00f) * 8.0f) - 1027.5) / 10.0f);
+		fXCorner = (float) ((((dwBlockX+1.00f) * 8.0f) - 1027.5) / 10.0f);
+		fYCorner = (float) ((((dwBlockY+1.00f) * 8.0f) - 1027.5) / 10.0f);
 	}
 
 	float fDiv = (1.0/ MODEL_SCALE_FACTOR) / 2.0;
+    glPushName(0xDEADBEEF);
 
-			glPushName(0xDEADBEEF);
-	for (int y=0;y<8;y++)
+	for (int y=0;y<CELLDIM;y++)
 	{
-		for (int x=0;x<8;x++)
+		for (int x=0;x<CELLDIM;x++)
 		{
 			int type0;
-			if ((m_lbFFFF.wTopo[x][y] & 0x0003)) type0 = 32;
-			else type0 = (m_lbFFFF.wTopo[x][y] & 0x00FF) >> 2;
+            if ((m_lbCell.wTopo[x][y] & 0x0003)) {
+                type0 = 32;
+            }
+            else {
+                type0 = (m_lbCell.wTopo[x][y] & 0x00FF) >> 2;
+            }
 
-			bool NESW = FSplitNESW((dwBlockX * 8) | x, (dwBlockY * 8) | y);
+			bool NESW = getSplitDirectionNESW(x, y);
 
 			int tex1 = m_Portal->FindTexturePalette(texnum[type0], 0);
 
@@ -399,36 +431,36 @@ int cLandblock::Draw()
 			glColor4f(1,1,1,1.0f);
 			if (NESW)
 			{
-				glTexCoord2f(0,0);
-				glVertex3f(fXCorn + x/10.0f, fYCorn + y/10.0f, m_lbFFFF.bZ[x][y]/fDiv);
+                glTexCoord2f(0,0);
+				glVertex3f(fXCorner + x/10.0f, fYCorner + y/10.0f, vertexHeights[x][y]/fDiv);
 
 				glTexCoord2f(2,0);
-				glVertex3f(fXCorn + (x+1)/10.0f, fYCorn + y/10.0f, m_lbFFFF.bZ[x+1][y]/fDiv);
+				glVertex3f(fXCorner + (x+1)/10.0f, fYCorner + y/10.0f, vertexHeights[x+1][y]/fDiv);
 
 				glTexCoord2f(2,2);
-				glVertex3f(fXCorn + (x+1)/10.0f, fYCorn + (y+1)/10.0f, m_lbFFFF.bZ[x+1][y+1]/fDiv);
+				glVertex3f(fXCorner + (x+1)/10.0f, fYCorner + (y+1)/10.0f, vertexHeights[x+1][y+1]/fDiv);
 
 				glTexCoord2f(0,2);
-				glVertex3f(fXCorn + x/10.0f, fYCorn + (y+1)/10.0f, m_lbFFFF.bZ[x][y+1]/fDiv);
+				glVertex3f(fXCorner + x/10.0f, fYCorner + (y+1)/10.0f, vertexHeights[x][y+1]/fDiv);
 			}
 			else
-			{
+			{ // NW-SE
 				glTexCoord2f(2,0);
-				glVertex3f(fXCorn + (x+1)/10.0f, fYCorn + y/10.0f, m_lbFFFF.bZ[x+1][y]/fDiv);
+				glVertex3f(fXCorner + (x+1)/10.0f, fYCorner + y/10.0f, vertexHeights[x+1][y]/fDiv);
 
 				glTexCoord2f(2,2);
-				glVertex3f(fXCorn + (x+1)/10.0f, fYCorn + (y+1)/10.0f, m_lbFFFF.bZ[x+1][y+1]/fDiv);
+				glVertex3f(fXCorner + (x+1)/10.0f, fYCorner + (y+1)/10.0f, vertexHeights[x+1][y+1]/fDiv);
 
 				glTexCoord2f(0,2);
-				glVertex3f(fXCorn + x/10.0f, fYCorn + (y+1)/10.0f, m_lbFFFF.bZ[x][y+1]/fDiv);
+				glVertex3f(fXCorner + x/10.0f, fYCorner + (y+1)/10.0f, vertexHeights[x][y+1]/fDiv);
 
 				glTexCoord2f(0,0);
-				glVertex3f(fXCorn + x/10.0f, fYCorn + y/10.0f, m_lbFFFF.bZ[x][y]/fDiv);
+				glVertex3f(fXCorner + x/10.0f, fYCorner + y/10.0f, vertexHeights[x][y]/fDiv);
 			}
 			glEnd();
 		}
 	}
-			glPopName();
+	glPopName();
 
 
 	//Draw the Objects
@@ -444,16 +476,16 @@ int cLandblock::Draw()
 /*			glBegin(GL_LINE_STRIP);
 
 			glColor4ub(landColor[type0][0], landColor[type0][1], landColor[type0][2], 255);
-			glVertex3f(fXCorn + x/10.0f, fYCorn + y/10.0f, m_lbFFFF.bZ[x][y]/fDiv);
+			glVertex3f(fXCorner + x/10.0f, fYCorner + y/10.0f, vertexHeights[x][y]/fDiv);
 
 			glColor4ub(landColor[type1][0], landColor[type1][1], landColor[type1][2], 255);
-			glVertex3f(fXCorn + (x+1)/10.0f, fYCorn + y/10.0f, m_lbFFFF.bZ[x+1][y]/fDiv);
+			glVertex3f(fXCorner + (x+1)/10.0f, fYCorner + y/10.0f, vertexHeights[x+1][y]/fDiv);
 
 			glColor4ub(landColor[type2][0], landColor[type2][1], landColor[type2][2], 255);
-			glVertex3f(fXCorn + (x+1)/10.0f, fYCorn + (y+1)/10.0f, m_lbFFFF.bZ[x+1][y+1]/fDiv);
+			glVertex3f(fXCorner + (x+1)/10.0f, fYCorner + (y+1)/10.0f, vertexHeights[x+1][y+1]/fDiv);
 
 			glColor4ub(landColor[type3][0], landColor[type3][1], landColor[type3][2], 255);
-			glVertex3f(fXCorn + x/10.0f, fYCorn + (y+1)/10.0f, m_lbFFFF.bZ[x][y+1]/fDiv);
+			glVertex3f(fXCorner + x/10.0f, fYCorner + (y+1)/10.0f, vertexHeights[x][y+1]/fDiv);
 
 			glEnd();
 
@@ -462,16 +494,16 @@ int cLandblock::Draw()
 			if (NESW)
 			{
 			glColor4ub(landColor[type0][0], landColor[type0][1], landColor[type0][2], 255);
-			glVertex3f(fXCorn + x/10.0f, fYCorn + y/10.0f, m_lbFFFF.bZ[x][y]/fDiv);
+			glVertex3f(fXCorner + x/10.0f, fYCorner + y/10.0f, vertexHeights[x][y]/fDiv);
 			glColor4ub(landColor[type2][0], landColor[type2][1], landColor[type2][2], 255);
-			glVertex3f(fXCorn + (x+1)/10.0f, fYCorn + (y+1)/10.0f, m_lbFFFF.bZ[x+1][y+1]/fDiv);
+			glVertex3f(fXCorner + (x+1)/10.0f, fYCorner + (y+1)/10.0f, vertexHeights[x+1][y+1]/fDiv);
 			}
 			else
 			{
 			glColor4ub(landColor[type1][0], landColor[type1][1], landColor[type1][2], 255);
-			glVertex3f(fXCorn + (x+1)/10.0f, fYCorn + y/10.0f, m_lbFFFF.bZ[x+1][y]/fDiv);
+			glVertex3f(fXCorner + (x+1)/10.0f, fYCorner + y/10.0f, vertexHeights[x+1][y]/fDiv);
 			glColor4ub(landColor[type3][0], landColor[type3][1], landColor[type3][2], 255);
-			glVertex3f(fXCorn + x/10.0f, fYCorn + (y+1)/10.0f, m_lbFFFF.bZ[x][y+1]/fDiv);
+			glVertex3f(fXCorner + x/10.0f, fYCorner + (y+1)/10.0f, vertexHeights[x][y+1]/fDiv);
 			}
 
 			glEnd();*/
@@ -480,9 +512,9 @@ int cLandblock::Draw()
 			if (type0 == 32)
 			{
 				glColor3f(1.0,1.0,1.0);
-				glRasterPos3f(fXCorn + x/10.0f, fYCorn + y/10.0f, m_lbFFFF.bZ[x][y]/fDiv);
+				glRasterPos3f(fXCorner + x/10.0f, fYCorner + y/10.0f, vertexHeights[x][y]/fDiv);
 
 				char lele[50];
-				sprintf(lele, "%02X - %08X - %04X", type0, texnum[type0], m_lbFFFF.wTopo[x][y]);
+				sprintf(lele, "%02X - %08X - %04X", type0, texnum[type0], m_lbCell.wTopo[x][y]);
 				glCallLists(strlen(lele), GL_UNSIGNED_BYTE, lele); 
 			}*/

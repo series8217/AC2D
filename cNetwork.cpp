@@ -458,9 +458,9 @@ void cNetwork::SetInterface(cInterface *Interface)
 	m_Interface = Interface;
 }
 
-void cNetwork::SetObjectDB(cObjectDB *ObjectDB)
+void cNetwork::SetWorld(cWorld *World)
 {
-	m_ObjectDB = ObjectDB;
+	m_World = World;
 }
 
 void cNetwork::SetCharInfo(cCharInfo *CharInfo)
@@ -1557,7 +1557,7 @@ void cNetwork::ProcessMessage(cMessage *Msg, stServerInfo *Server)
 	case 0x0024:
 		{
 			//destroy object
-			m_ObjectDB->DeleteObject(Msg->ReadDWORD());
+			m_World->DeleteObject(Msg->ReadDWORD());
 			break;
 		}
 	case 0x0197:
@@ -1568,7 +1568,7 @@ void cNetwork::ProcessMessage(cMessage *Msg, stServerInfo *Server)
 			DWORD count = Msg->ReadDWORD();
 			DWORD value = Msg->ReadDWORD();
 
-			cWObject *tpObj = m_ObjectDB->FindObject(item);
+			cWObject *tpObj = m_World->FindObject(item);
 			if (!tpObj)
 				return;
 			tpObj->AdjustStack(count, value);
@@ -1833,10 +1833,10 @@ void cNetwork::ProcessMessage(cMessage *Msg, stServerInfo *Server)
 		{
 			//change model
 			DWORD object = Msg->ReadDWORD();
-			cWObject *woThis = m_ObjectDB->FindObject(object);
+			cWObject *woThis = m_World->FindObject(object);
 			if (!woThis)
 			{
-				m_ObjectDB->Unlock();
+				m_World->Unlock();
 				return;
 			}
 			woThis->ParseItemObjDescEvent(Msg);
@@ -1916,7 +1916,7 @@ void cNetwork::ProcessMessage(cMessage *Msg, stServerInfo *Server)
 			//create object
 			cWObject *tpObj = new cWObject();
 			tpObj->ParseItemCreateObject(Msg);
-			m_ObjectDB->AddObject(tpObj);
+			m_World->AddObject(tpObj);
 
 			if (tpObj->GetGUID() == m_dwGUIDLogin)
 			{
@@ -1959,7 +1959,7 @@ void cNetwork::ProcessMessage(cMessage *Msg, stServerInfo *Server)
 			//hack
 			if (object == m_dwGUIDLogin)
 				return;
-			m_ObjectDB->DeleteObject(object);
+			m_World->DeleteObject(object);
 			DWORD unknown = Msg->ReadDWORD();
 			break;
 		}
@@ -1967,7 +1967,7 @@ void cNetwork::ProcessMessage(cMessage *Msg, stServerInfo *Server)
 		{
 			//set position/motion
 			DWORD object = Msg->ReadDWORD();
-			cWObject *tpObj = m_ObjectDB->FindObject(object);
+			cWObject *tpObj = m_World->FindObject(object);
             //if (tpObj->GetGUID() == m_dwGUIDLogin) {
             //    m_Interface->OutputConsoleString("IGNORED Player position updated by server");
             //    break;
@@ -2013,7 +2013,7 @@ void cNetwork::ProcessMessage(cMessage *Msg, stServerInfo *Server)
 		{
 			//animation...
 			DWORD object = Msg->ReadDWORD();
-			cWObject *woThis = m_ObjectDB->FindObject(object);
+			cWObject *woThis = m_World->FindObject(object);
 			if (!woThis)
 				return;
 			woThis->ParseMovementSetObjectMovement(Msg);
@@ -2143,7 +2143,7 @@ void cNetwork::ProcessMessage(cMessage *Msg, stServerInfo *Server)
 				}
 			case 0x0196:
 				{
-					m_ObjectDB->ParsePackContents(Msg);
+					m_World->ParsePackContents(Msg);
 					break;
 				}
 			case 0x004D:
@@ -2386,10 +2386,10 @@ void cNetwork::ProcessMessage(cMessage *Msg, stServerInfo *Server)
 			DWORD unknown = Msg->ReadDWORD();
 			DWORD coverage = Msg->ReadDWORD();
 			
-			cWObject *tpObj = m_ObjectDB->FindObject(object);
-			m_ObjectDB->Lock();
+			cWObject *tpObj = m_World->FindObject(object);
+			m_World->Lock();
 			tpObj->Set229(unknown, coverage);
-			m_ObjectDB->Unlock();
+			m_World->Unlock();
 			break;
 		}
 	case 0x022D:
@@ -2401,10 +2401,10 @@ void cNetwork::ProcessMessage(cMessage *Msg, stServerInfo *Server)
 			DWORD container = Msg->ReadDWORD();
 			DWORD sequence2 = Msg->ReadDWORD();
 
-			cWObject *tpObj = m_ObjectDB->FindObject(object);
-			m_ObjectDB->Lock();
+			cWObject *tpObj = m_World->FindObject(object);
+			m_World->Lock();
 			tpObj->Set22D(equipType, container);
-			m_ObjectDB->Unlock();
+			m_World->Unlock();
 			break;
 		}
 	case 0xF7AB:
@@ -2618,7 +2618,7 @@ void cNetwork::SendPositionUpdate(stLocation *Location, stMoveInfo *MoveInfo)
 
 void cNetwork::SendMoveUpdate(int iFB, int iStrafe, int iTurn, bool bRunning)
 {
-    cWObject *woMyself = m_ObjectDB->FindObject(m_dwGUIDLogin);
+    cWObject *woMyself = m_World->FindObject(m_dwGUIDLogin);
     if (!woMyself)
         return;
 
