@@ -260,6 +260,7 @@
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Disabled</Optimization>
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Disabled</Optimization>
     </ClCompile>
+    <ClCompile Include="cWorld.cpp" />
     <ClCompile Include="Landblocks.cpp" />
     <ClCompile Include="stdafx.cpp">
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Disabled</Optimization>
@@ -297,6 +298,7 @@
     <ClInclude Include="cThread.h" />
     <ClInclude Include="cTurbineFile.h" />
     <ClInclude Include="cWObject.h" />
+    <ClInclude Include="cWorld.h" />
     <ClInclude Include="Landblocks.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="stdafx.h" />

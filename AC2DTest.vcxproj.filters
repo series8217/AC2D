@@ -102,6 +102,9 @@
     <ClCompile Include="ChecksumXorGenerator.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="cWorld.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AC2DTest.h">
@@ -264,6 +267,9 @@
       <Filter>Window Controls</Filter>
     </ClInclude>
     <ClInclude Include="ChecksumXorGenerator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cWorld.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
