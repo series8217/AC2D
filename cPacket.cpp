@@ -4,7 +4,7 @@
 cPacket::cPacket()
 {
 	m_iLength = 0;
-	m_iMaxLength = 1024;
+	m_iMaxLength = NETWORK_PACKET_BUF_SIZE;
 
 	m_pbDataPtr = m_pbData = new BYTE[m_iMaxLength];
 }

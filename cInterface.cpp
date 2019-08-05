@@ -974,8 +974,9 @@ bool cInterface::OnMouseDown( IWindow & Window, float X, float Y, unsigned long 
 		else
 			return true;
 
-		DWORD *pbSelBuffer = new DWORD[500];
-		ZeroMemory(pbSelBuffer, 500*4);
+# define PBSELBUFFERSIZE 500
+		DWORD *pbSelBuffer = new DWORD[PBSELBUFFERSIZE];
+		ZeroMemory(pbSelBuffer, PBSELBUFFERSIZE * sizeof(DWORD));
 		
 		glSelectBuffer(500, (GLuint *) pbSelBuffer);
 

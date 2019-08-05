@@ -299,6 +299,8 @@
     <ClInclude Include="cTurbineFile.h" />
     <ClInclude Include="cWObject.h" />
     <ClInclude Include="cWorld.h" />
+    <ClInclude Include="GameEventType.h" />
+    <ClInclude Include="GameMessageOpcode.h" />
     <ClInclude Include="Landblocks.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="stdafx.h" />

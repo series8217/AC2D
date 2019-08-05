@@ -64,10 +64,9 @@ void cClient::Run()
     m_Interface->SetWorld(m_World);
     m_Network->SetWorld(m_World);
 
-	//Start the connection
+	//Start the network stack (it will connect on its own)
 #ifndef TerrainOnly
 	m_Network->Start();
-	m_Network->Connect();
 #endif
 
 	m_bInit = true;

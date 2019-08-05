@@ -1,5 +1,7 @@
 #pragma once
 
+#define NETWORK_PACKET_BUF_SIZE 1024
+
 class cPacket {
 public:
 	cPacket();

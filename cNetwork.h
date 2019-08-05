@@ -22,10 +22,14 @@ const float max_sidestep_anim_rate	= 3.0f;
 #define SF_CRCSEEDS (1 << 2)
 
 // timeout and interval settings
+// how long we wait for a packet to arrive before servicing other network stuff
+#define TIMEOUT_PACKET_POLL_MS 100
 // Connection attempt timeout
-#define TIMEOUT_MS  1000
+#define TIMEOUT_CONNECT_MS  5000
 // enter world timeout
-#define TIMEOUT_ENTER_GAME_MS 4000
+#define TIMEOUT_ENTER_GAME_MS 5000
+// timeout after connection established
+#define TIMEOUT_SERVER_MS 5000
 // Interval between ack messages sent by us
 #define ACK_INTERVAL_MS 2000
 // Interval between player location updates sent client to server
@@ -161,6 +165,7 @@ public:
     
     void SendAckPacket(stServerInfo *Server);
 
+    void ReceivePacket();
     void ProcessFragment(cByteStream* stream, stServerInfo *Server);
 	void ProcessPacket(cPacket *Packet, stServerInfo *Server);
 	void ProcessWSPacket(cPacket *Packet, stServerInfo *Server);
@@ -202,6 +207,8 @@ public:
 	void Disconnect();
 	void CloseConnection(stServerInfo *Server);
 
+    void SendLoginPacket();
+
 	stServerInfo * AddWorldServer(SOCKADDR_IN NewServer);
 	void SetActiveWorldServer(SOCKADDR_IN NewServer);
     void DumpWorldServerList();
@@ -218,13 +225,17 @@ private:
 	WORD GetTime();
 
 	SOCKET m_sSocket;
+    FD_SET m_readfds;
+    FD_SET m_masterfds;
+    struct timeval m_socketTimeout;
+
 	DWORD m_dwStartTicks;
 	int iConnPacketCount;
 
 	DWORD m_dwFragmentSequenceOut;
 	DWORD m_dwGameEventOut;
 
-    DWORD m_dwEnterGameTimeout; // time after which we time out trying to enter game
+    DWORD m_dwNextConnectionTimeout;
 
 	stServerInfo m_siLoginServer;
 	std::list <stServerInfo> m_siWorldServers;
@@ -232,9 +243,14 @@ private:
 
 	BYTE m_zTicketSize;
 	BYTE m_zTicket[0x100];
-	char m_zTicketKey[100];
-	char m_zAccountName[40];
-	char m_zPassword[100];
+
+#define TICKETKEY_SIZESIZE 100
+#define ACCOUNTNAME_SIZE 40
+#define PASSWORD_SIZE 100
+
+	char m_zTicketKey[TICKETKEY_SIZESIZE];
+	char m_zAccountName[ACCOUNTNAME_SIZE];
+	char m_zPassword[PASSWORD_SIZE];
 
     DWORD m_dwGUIDLogin;
 

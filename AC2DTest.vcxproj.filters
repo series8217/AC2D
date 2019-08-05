@@ -272,6 +272,12 @@
     <ClInclude Include="cWorld.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="GameMessageOpcode.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GameEventType.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="AC2DTest.ico">

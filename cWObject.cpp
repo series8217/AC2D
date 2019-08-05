@@ -154,7 +154,7 @@ void cWObject::PlayAnimation(WORD wAnim, WORD wStance, float fPlaySpeed, bool bS
 	}
 }
 
-void cWObject::ParseMovementSetObjectMovement(cMessage * Message)
+void cWObject::ParseMessageMotion(cMessage * Message)
 {
     /* 0xF74C event */
 	Lock();
@@ -316,7 +316,7 @@ void cWObject::ParseMovementSetObjectMovement(cMessage * Message)
 	Unlock();
 }
 
-void cWObject::ParseItemObjDescEvent(cMessage * Message)
+void cWObject::ParseMessageObjDesc(cMessage * Message)
 {
     // 0xF625 event
 	Lock();
@@ -366,14 +366,14 @@ void cWObject::ParseItemObjDescEvent(cMessage * Message)
 	Unlock();
 }
 
-void cWObject::ParseItemCreateObject(cMessage * Message)
+void cWObject::ParseMessageObjectCreate(cMessage * Message)
 {
     /* 0xF745 event */
 	Lock();
 	GUID = Message->ReadDWORD();
 
 	//mmm, code reuse
-	ParseItemObjDescEvent(Message);
+	ParseMessageObjDesc(Message);
 
 	DWORD flags = Message->ReadDWORD();
 	portalMode = Message->ReadWORD();
@@ -663,7 +663,7 @@ void cWObject::ParseItemCreateObject(cMessage * Message)
 	Unlock();
 }
 
-void cWObject::ParseMovementPositionEvent(cMessage * Message)
+void cWObject::ParseMessageUpdatePosition(cMessage * Message)
 {
     // 0xF748 message
     // Server updated position of object
