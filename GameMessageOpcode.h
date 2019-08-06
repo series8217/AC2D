@@ -1,5 +1,7 @@
 #pragma once
 
+//** From ACE: https://github.com/ACEmulator/ACE
+
 namespace GameMessages {
     enum RawMotionFlags
     {
