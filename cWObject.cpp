@@ -217,6 +217,7 @@ void cWObject::ParseMessageMotion(cMessage * Message)
 				//movement speed (forward/backwards)
                 fVelocityFB = Message->ReadFloat();
 				fSpeed = fabs(fVelocityFB);
+                // XXX: where does this scaling factor come from?
 				fVelocityFB *= 3;
 				m_bMoving = true;
 			}
@@ -241,13 +242,14 @@ void cWObject::ParseMessageMotion(cMessage * Message)
 			{
 				//anim sequence
 				wAnimToPlay = Message->ReadWORD();
-				WORD sequence = Message->ReadWORD();
+				WORD animSequence = Message->ReadWORD();
 				fSpeed = Message->ReadFloat();
 				bSetDefault = false;
 			}
 
 			if (!m_bMoving)
 			{
+                // XXX: ???
 //				fVelocityStrafe = 0;
 //				fVelocityTurn = 0;
 //				fVelocityFB = 0;
