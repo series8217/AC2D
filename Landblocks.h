@@ -9,7 +9,7 @@
 // a landblock has this many vertices squared
 #define VERTEXDIM (CELLDIM+1)
 
-#pragma pack(1)
+#pragma pack(push,1)
 struct stLandblockCell {
 	DWORD dwID;
 	DWORD dwObjectBlock;
@@ -17,7 +17,7 @@ struct stLandblockCell {
 	BYTE bZ[VERTEXDIM][VERTEXDIM];
 	BYTE bPadding;
 };
-#pragma pack(4)
+#pragma pack(pop)
 
 class cLandblock
 {
