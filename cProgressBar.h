@@ -22,13 +22,20 @@ private:
 			iTop = GetAbsoluteTop(),
 			iBottom = iTop + GetHeight();
 
+        float currentRight = iLeft + (GetWidth()*((m_fCurrent - m_fMin) / (m_fMax - m_fMin)));
+
+        if (currentRight > iRight) {
+            // for "overfilled" progress bar, make sure not to draw outside of the window
+            currentRight = iRight;
+        }
+
 		glBindTexture(GL_TEXTURE_2D, 0);
 
 		glBegin(GL_QUADS);
 			glColor3ub((BYTE) (m_dwColor),(BYTE) (m_dwColor >> 8),(BYTE) (m_dwColor >> 16));
 			glVertex2f(iLeft,iTop);
-			glVertex2f(iLeft+(GetWidth()*((m_fCurrent - m_fMin)/(m_fMax - m_fMin))),iTop);
-			glVertex2f(iLeft+(GetWidth()*((m_fCurrent - m_fMin)/(m_fMax - m_fMin))),iBottom);
+			glVertex2f(currentRight,iTop);
+			glVertex2f(currentRight,iBottom);
 			glVertex2f(iLeft,iBottom);
 		glEnd();
 
