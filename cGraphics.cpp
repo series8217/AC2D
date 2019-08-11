@@ -12,7 +12,9 @@ int LastFPS[10];
 cGraphics::cGraphics(HWND hWnd)
 {
 	m_hWnd = hWnd;
-	EnableOpenGL();
+    if (EnableOpenGL() != 0) {
+        MessageBox(NULL, "Failed to enable OpenGL", "Error!", MB_OK);
+    }
 }
 
 cGraphics::~cGraphics()
@@ -25,7 +27,7 @@ void cGraphics::SetInterface(cInterface *Interface)
 	m_Interface = Interface;
 }
 
-void cGraphics::EnableOpenGL()
+int cGraphics::EnableOpenGL()
 {
 	// get the device context (DC)
 	m_hDC = GetDC( m_hWnd );
@@ -52,7 +54,9 @@ void cGraphics::EnableOpenGL()
 		0, 0, 0                // layer masks ignored 
 		};
 
-	SetPixelFormat( m_hDC, ChoosePixelFormat( m_hDC, &pfd ), &pfd );
+    if (!SetPixelFormat(m_hDC, ChoosePixelFormat(m_hDC, &pfd), &pfd)) {
+        return -1;
+    }
 	
 	// create and enable the render context (RC)
 	m_hGLRC = wglCreateContext( m_hDC );
@@ -86,6 +90,7 @@ void cGraphics::EnableOpenGL()
 	GLfloat dif0[4] = { 1.0f, 1.0f, 1.0f, 1.0f }; glLightfv(GL_LIGHT0,GL_DIFFUSE,dif0);
 	GLfloat spc0[4] = { 0.0f, 0.0f, 0.0f, 1.0f }; glLightfv(GL_LIGHT0,GL_SPECULAR,dif0);
 
+    // create fonts for heights from 4 to 24 (inclusive)
 	for (int i=4; i<=24; i++)
 	{
 		HFONT tpfont = CreateFont(i+2, 0, 0, 0, FW_NORMAL, false, false, 0, DEFAULT_CHARSET,
@@ -107,6 +112,7 @@ void cGraphics::EnableOpenGL()
 	glClearDepth(1.0f);
 
 	glCompressedTexImage2DARB = (PFNGLCOMPRESSEDTEXIMAGE2DARBPROC)wglGetProcAddress("glCompressedTexImage2DARB");
+    return 0;
 }
 
 // Disable OpenGL
@@ -156,17 +162,23 @@ void cGraphics::Run()
 		//fps calc
 		LARGE_INTEGER liTemp;
 		QueryPerformanceCounter(&liTemp);
-		for (int i=FPS_SAMPLES-2;i>=0;i--) LastFPS[i+1] = LastFPS[i];
+        for (int i = FPS_SAMPLES - 2;i >= 0;i--) {
+            LastFPS[i + 1] = LastFPS[i];
+        }
 		LastFPS[0] = (int) (liTimerFreq.QuadPart/(liTemp.QuadPart - liLastTimer.QuadPart));
 
 		liLastTimer = liTemp;
 
 		int iFPS = 0;
-		for (int i=0;i<FPS_SAMPLES;i++) iFPS += LastFPS[i];
+        for (int i = 0;i < FPS_SAMPLES;i++) {
+            iFPS += LastFPS[i];
+        }
 		iFPS /= FPS_SAMPLES;
 
-		char pbTemp[100];
-		_snprintf(pbTemp, 100, "AC2D - %04i FPS - %i Tris - Cell: %i, Portal: %i - %0.1f Speed - %04X Landblock", iFPS, tricount, m_Cell->GetPoolSize(), m_Portal->GetPoolSize(), m_Interface->GetZoomSpeed(), m_Interface->GetPosition());
+#define WINDOW_TITLE_STRING_BUFFER_SIZE 256
+
+		char pbTemp[WINDOW_TITLE_STRING_BUFFER_SIZE];
+		_snprintf_s(pbTemp, WINDOW_TITLE_STRING_BUFFER_SIZE, "AC2D - %04i FPS - %i Tris - Cell: %i, Portal: %i - %0.1f Speed - %04X Landblock", iFPS, tricount, m_Cell->GetPoolSize(), m_Portal->GetPoolSize(), m_Interface->GetZoomSpeed(), m_Interface->GetPosition());
 		SetWindowText(m_hWnd,pbTemp);
 
 		//sleep so other windows can have some cpu

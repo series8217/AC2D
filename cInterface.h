@@ -17,7 +17,7 @@
 
 struct stCharList {
 	struct CharInfo {
-		char	Name[32];
+		char	Name[64];
 		DWORD	GUID;
 		DWORD	DelTimeout;
 	};

@@ -10,7 +10,6 @@ CMessageBox::CMessageBox()
 	HIJ = 0;
 	Okay.SetParent( this );
 	Cancel.SetParent( this );
-
 	return;
 }
 

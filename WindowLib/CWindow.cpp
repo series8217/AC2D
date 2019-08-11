@@ -587,16 +587,16 @@ bool CWindow::JumpToFront()
 		return true;
 	}
 
-	try
+	//try
 	{
 		IWindow *OldParent = Parent;
 		Parent->RemoveChild( *this );
 		OldParent->AddChild( *this, true );
 		//Parent->GetChildren().remove( (IWindow *)this );
 		//Parent->GetChildren().push_back( this );
-	} catch( ... ) {
-		return false;
-	}
+	} //catch( ... ) {
+	//	return false;
+	//}
 
 	return true;
 }
@@ -608,14 +608,14 @@ bool CWindow::JumpToBack()
 		return true;
 	}
 
-	try
+	//try
 	{
 		IWindow *OldParent = Parent;
 		Parent->RemoveChild( *this );
 		OldParent->AddChild( *this );
-	} catch( ... ) {
-		return false;
-	}
+	}// catch( ... ) {
+	//	return false;
+	//}
 
 	return true;
 }
@@ -624,7 +624,10 @@ bool CWindow::AddChild( IWindow &Child, bool AddToBack )
 {
 	//THIS SHOULD BE CLEANED UP WHEN A CUSTOM LIST TAKES THE PLACE OF STD::LIST
 	//ALSO, THIS UPDATING FLAG IS ASS, BUT I CAN'T THINK OF A BETTER FIX AT THE MOMENT
-	
+    if (&Child == NULL) {
+        return false;
+    }
+
 	if( &Child == this )
 	{
 		return false;
@@ -642,7 +645,7 @@ bool CWindow::AddChild( IWindow &Child, bool AddToBack )
 		Child.GetParent()->RemoveChild( Child );
 	}
 
-	try
+	//try
 	{	
 		if( AddToBack == false )
 		{
@@ -652,10 +655,10 @@ bool CWindow::AddChild( IWindow &Child, bool AddToBack )
 		{
 			Children.push_back( &Child );
 		}
-	} catch( ... ) {
-		Updating = false;
-		return false;
-	}
+	} //catch( ... ) {
+	//	Updating = false;
+	//	return false;
+	//}
 
 	Child.SetParent( this );
 
@@ -676,13 +679,13 @@ bool CWindow::RemoveChild( IWindow &Child )
 
 	Updating = true;
 
-	try
+	//try
 	{
 		Children.remove( &Child );
-	} catch( ... ) {
-		Updating = false;
-		return false;
-	}
+	} //catch( ... ) {
+	//	Updating = false;
+	//	return false;
+	//}
 
 	Child.SetParent( NULL );
 	

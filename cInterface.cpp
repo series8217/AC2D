@@ -1,16 +1,21 @@
 #include "stdafx.h"
 #include "cInterface.h"
+#include "cPhysics.h"
+#include "Skill.h"
 
 DWORD dwAnim = 0x030000AC;//0x03000000 | 2128;
 DWORD dwTexBase = 0x06000000;
 cInterface::cInterface()
 {
 //	cWObject *WO = new cWObject();
+    m_Network = NULL;
+    m_CharInfo = NULL;
+    m_World = NULL;
 
 	m_fConnProgress = 0;
 
 	m_vConsoleHistory.clear();
-	strcpy(m_MOTD, "Waiting for MOTD...");
+	strncpy_s(m_MOTD, "Waiting for MOTD...", 2048-1);
 	ZeroMemory(&m_CharList, sizeof(m_CharList));
 	m_dwSelChar = 0;
 	m_dwLastAttacker = 0;
@@ -19,6 +24,7 @@ cInterface::cInterface()
 
 	m_bFirstSize = true;
 
+    fSpeed = 0.0f;
 
 	m_fCamDist = 0.025f;
 	m_fCamRotX = (float) M_PI;
@@ -34,9 +40,6 @@ cInterface::cInterface()
     m_MotionControlsState.autoRun = false;
 
 	bMotionUpdate = false;
-
-    // XXX: get this from character stats?
-	fSpeed = 32;
 	
     // XXX: where does this starting value come from?
 	FlyerCenter = cPoint3D(93.45f, -82.15f, 0.85f);
@@ -58,13 +61,11 @@ cInterface::cInterface()
 	QueryPerformanceCounter(&liLast);
 
 	InitializeCriticalSection(&csChat);
-
 	//Initialize Interface
-	m_WindowManager = new CWindowManager();
+ 	m_WindowManager = new CWindowManager();
 	m_WindowManager->AddWindow(*this);
 	SetVisible(true);
 	m_WindowManager->SetFocusedWindow(this);
-
 /*	DWORD texes[] = {
 //		0x05001371,
 //		0x0500143E,
@@ -131,15 +132,14 @@ cInterface::cInterface()
 	m_mwMinimap->SetTransparency(0.6f);
 	m_mwMinimap->SetTitle("Minimap");
 	m_mwMinimap->SetIcon(0x06001065);
-	AddChild(*m_mwMinimap);
 
+    AddChild(*m_mwMinimap);
 	m_mwChat = new cChatWindow();
 	m_mwChat->SetTransparency(0.6f);
 	m_mwChat->SetTitle("Chat");
 	m_mwChat->SetIcon(0x0600137D);
 	AddChild(*m_mwChat);
-
-	m_mwSpellBar = new cSpellBar();
+    m_mwSpellBar = new cSpellBar();
 	AddChild(*m_mwSpellBar);
 
 	m_mwRadar = new cRadar();
@@ -306,7 +306,7 @@ void cInterface::OutputConsoleString(char *format, ...)
 	static char	output[1024];
 	
 	va_start(argPtr, format);
-	vsprintf(output, format, argPtr);
+	vsnprintf(output, 1024, format, argPtr);
 	va_end(argPtr);
 
 	OutputConsoleString((std::string)output);
@@ -320,8 +320,9 @@ void cInterface::OutputConsoleString(std::string & Output)
 	OutputDebugString(Output.c_str());
 	OutputDebugString(_T("\r\n"));
 	
-	FILE *out = fopen("AC2DConsole.txt","at");
-	if (out)
+    FILE *out;
+    int retval = fopen_s(&out, "AC2DConsole.txt", "at");
+	if (out && retval == 0)
 	{
 		fprintf(out, "%s\r\n", Output.c_str());
 		fclose(out);
@@ -335,7 +336,7 @@ void cInterface::OutputString(eColor Color, char *format, ...)
 	static char	output[1024];
 	
 	va_start(argPtr, format);
-	vsprintf(output, format, argPtr);
+	vsnprintf(output, 1024, format, argPtr);
 	va_end(argPtr);
 
 	OutputString(Color, std::string(output));
@@ -362,7 +363,7 @@ void cInterface::SetConnProgress(float NewProgress)
 	else
 	{
 		char Lele[50];
-		sprintf(Lele, "Connecting: %i%%", (int) (m_fConnProgress*100));
+		snprintf(Lele, 50, "Connecting: %i%%", (int) (m_fConnProgress*100));
 		m_stConnecting->SetText(Lele);
 	}
 //	Unlock();
@@ -370,6 +371,9 @@ void cInterface::SetConnProgress(float NewProgress)
 
 int cInterface::Draw(RECT rRect, HDC hDC)
 {
+    assert(m_World);
+    assert(m_mwChat);
+
 	DispatchMessages();
 
 //	Lock();
@@ -380,10 +384,6 @@ int cInterface::Draw(RECT rRect, HDC hDC)
 	QueryPerformanceCounter(&liTemp);
 	float fTimeDiff = (float) (liTemp.QuadPart - liLast.QuadPart)/liFreq.QuadPart;
 	liLast = liTemp;
-
-    if (m_World == NULL) {
-
-    }
 
     // update positions of objects (this include updating character position based on control inputs)
 	m_World->UpdateObjects(fTimeDiff);
@@ -415,7 +415,9 @@ int cInterface::Draw(RECT rRect, HDC hDC)
         if (m_dwLastLocationUpdate + LOCATION_UPDATE_INTERVAL_MS < GetTickCount()) {
             cWObject *woMyself = m_World->FindObject(m_dwSelChar);
             if (woMyself) {
-                m_Network->SendPositionUpdate(woMyself->GetLocation(), &woMyself->GetMoveInfo());
+                stLocation* myLocation = woMyself->GetLocation();
+                stMoveInfo myMoveInfo = woMyself->GetMoveInfo();
+                m_Network->SendPositionUpdate(myLocation, &myMoveInfo);
             }
             m_dwLastLocationUpdate = GetTickCount();
         }
@@ -423,32 +425,57 @@ int cInterface::Draw(RECT rRect, HDC hDC)
 
 	if (bMotionUpdate)
 	{
-		bMotionUpdate = false;
+        bMotionUpdate = false;
 
-		int iFB = 0, iStrafe = 0, iTurn = 0;
-
-		if (m_MotionControlsState.forward)
-			iFB++;
-		if (m_MotionControlsState.backward)
-			iFB--;
-		if (m_MotionControlsState.turnLeft)
-			iTurn--;
-		if (m_MotionControlsState.turnRight)
-			iTurn++;
-		if (m_MotionControlsState.sidestepLeft)
-			iStrafe--;
-		if (m_MotionControlsState.sidestepRight)
-			iStrafe++;
-
-		m_Network->SendMoveUpdate(iFB, iStrafe, iTurn, !m_MotionControlsState.walk);
-
-		//Update velocity info
+        //Update velocity info
         // XXX: should this be before UpdateObjects and SendPositionUpdate????
-		cWObject *woMyself = m_World->FindObject(m_dwSelChar);
-		if (woMyself)
-		{
+        cWObject *woMyself = m_World->FindObject(m_dwSelChar);
+        if (woMyself) {
+            float fRunSpeed = 1.0f;
+            float fSpeedScale = 1.0f;
+            float fForwardSpeed = 1.0f;
+            float fSidestepSpeed = 1.0f;
+
+            stInternalSkill *Sk = m_CharInfo->GetSkillInfo(Skill::Run);
+            if (Sk != NULL) {
+                // TODO: burdened runrate
+                fRunSpeed = Physics::MovementSystem::GetRunRate(0.0f, (int)Sk->dwBase, 1.0f);
+            }
+            if (m_MotionControlsState.walk) {
+                fRunSpeed = 1.0f;
+            }
+
+
+		    int iFB = 0, iStrafe = 0, iTurn = 0;
+
+		    if (m_MotionControlsState.forward)
+			    iFB++;
+		    if (m_MotionControlsState.backward)
+			    iFB--;
+		    if (m_MotionControlsState.turnLeft)
+			    iTurn--;
+		    if (m_MotionControlsState.turnRight)
+			    iTurn++;
+		    if (m_MotionControlsState.sidestepLeft)
+			    iStrafe--;
+		    if (m_MotionControlsState.sidestepRight)
+			    iStrafe++;
+
+            // backwards speed is slower
+            if (iFB < 0) {
+                fForwardSpeed = 2.5f * 0.65f * fRunSpeed * fSpeedScale;
+            }
+            else {
+                fForwardSpeed = 2.5f * fRunSpeed * fSpeedScale;
+            }
+
+            // sidestep speed
+            fSidestepSpeed = fSpeedScale * fRunSpeed * 3.12f * 0.5f;
+
+		    m_Network->SendMoveUpdate(iFB, iStrafe, iTurn, !m_MotionControlsState.walk);
+
             m_World->Lock();
-			woMyself->SetMoveVelocities(iFB*3.0f, iStrafe*-1.0f, iTurn*1.5f);
+			woMyself->SetMoveVelocities(iFB*fForwardSpeed, iStrafe*fSidestepSpeed, iTurn*1.5f);
             // process movement to update Location (not the same as Position -- Location is shared /w server!)
             //XXX: stLocation *lPlayer = woMyself->GetLocation();
             //XXX: stMoveInfo mPlayer = woMyself->GetMoveInfo();
@@ -593,7 +620,7 @@ void cInterface::SetCharList(stCharList *CharList)
 void cInterface::SetMOTD(char *MOTD)
 {
 	Lock();
-	strcpy(m_MOTD, MOTD);
+	strncpy_s(m_MOTD, MOTD, 2048-1);
 	m_stMOTD->SetText(m_MOTD);
 	Unlock();
 }
@@ -601,10 +628,10 @@ void cInterface::SetMOTD(char *MOTD)
 void cInterface::SetWorldPlayers(char *WorldName, DWORD Players, DWORD MaxPlayers)
 {
 	m_dwNumPlayers = Players;
-	strcpy(m_sWorldName, WorldName);
+	strncpy_s(m_sWorldName, WorldName, 128);
 
 	char motdBuf[500];
-	sprintf(motdBuf, "World: %s, Players: %i/%i", WorldName, Players, MaxPlayers);
+	snprintf(motdBuf, 500, "World: %s, Players: %i/%i", WorldName, (int)Players, (int)MaxPlayers);
 	SetMOTD(motdBuf);
 }
 
@@ -744,12 +771,12 @@ void cInterface::ParseEditInput( std::string &szInput )
 	{
 		char *Input = const_cast< char * >( szInput.c_str() ) + 1;
 
-		if( ! strnicmp( Input, "sm", 2 ) )
+		if( ! _strnicmp( Input, "sm", 2 ) )
 		{
 			m_Network->SendMaterialize();
 		}
 
-		if( ! strnicmp( Input, "tell ", 5 ) )
+		if( ! _strnicmp( Input, "tell ", 5 ) )
 		{
 			char *Name = Input + 5; // "tell "
 			char *Comma = strstr( Name, "," );
@@ -764,7 +791,7 @@ void cInterface::ParseEditInput( std::string &szInput )
 			}
 		}
 
-		else if( ! strnicmp( Input, "cast ", 5 ) )
+		else if( ! _strnicmp( Input, "cast ", 5 ) )
 		{
 			char *szAfterSpace = Input + 5; // "scast "
 
@@ -777,16 +804,16 @@ void cInterface::ParseEditInput( std::string &szInput )
 			}
 		}
 
-		else if( ! strnicmp( Input, "ar", sizeof("ar") ) )
+		else if( ! _strnicmp( Input, "ar", sizeof("ar") ) )
 			m_Network->SendAllegianceRecall();
 
-		else if( ! strnicmp( Input, "hr", sizeof("hr") ) )
+		else if( ! _strnicmp( Input, "hr", sizeof("hr") ) )
 			m_Network->SendHouseRecall();
 
-		else if( ! strnicmp( Input, "lr", sizeof("lr") ) )
+		else if( ! _strnicmp( Input, "lr", sizeof("lr") ) )
 			m_Network->SendLifestoneRecall();
 
-		else if( ! strnicmp( Input, "mr", sizeof("mr") ) )
+		else if( ! _strnicmp( Input, "mr", sizeof("mr") ) )
 			m_Network->SendMarketplaceRecall();
 	}
 
@@ -924,7 +951,7 @@ bool cInterface::OnMouseDown( IWindow & Window, float X, float Y, unsigned long 
 		}
 
 				char lele[500];
-				sprintf(lele, "%08X\r\n", m_dwCurSelect);
+				snprintf(lele, 500, "%08X\r\n", m_dwCurSelect);
 				OutputDebugString(lele);
 
 		delete []pbSelBuffer;
@@ -978,7 +1005,7 @@ bool cInterface::OnMouseDown( IWindow & Window, float X, float Y, unsigned long 
 		DWORD *pbSelBuffer = new DWORD[PBSELBUFFERSIZE];
 		ZeroMemory(pbSelBuffer, PBSELBUFFERSIZE * sizeof(DWORD));
 		
-		glSelectBuffer(500, (GLuint *) pbSelBuffer);
+		glSelectBuffer(PBSELBUFFERSIZE, (GLuint *) pbSelBuffer);
 
 		glRenderMode(GL_SELECT);
 		glInitNames();
@@ -1091,25 +1118,6 @@ bool cInterface::OnKeyUp( IWindow & Window, unsigned long KeyCode )
 	{
         m_MotionControlsState.sidestepRight = false;
 		bMotionUpdate = true;
-	}
-	if (KeyCode == 'F') // cycle through speed scaling
-	{
-		if (fSpeed == 1)
-			fSpeed = 2;
-		else if (fSpeed == 2)
-			fSpeed = 4;
-		else if (fSpeed == 4)
-			fSpeed = 8;
-		else if (fSpeed == 8)
-			fSpeed = 16;
-		else if (fSpeed == 16)
-			fSpeed = 32;
-		else if (fSpeed == 32)
-			fSpeed = 0.2f;
-		else if (fSpeed == 0.2f)
-			fSpeed = 0.5f;
-		else if (fSpeed == 0.5f)
-			fSpeed = 1;
 	}
 
 	return true;
@@ -1514,7 +1522,7 @@ bool cInterface::OnRender( IWindow & Window, double TimeSlice )
 
 				char tpfn[80];
 				size_t iCount;
-				sprintf(tpfn, "C:\\program files\\Turbine\\Asheron's Call - Throne of Destiny\\5005AFB1.charcache");
+				snprintf(tpfn, 80, "C:\\program files\\Turbine\\Asheron's Call - Throne of Destiny\\5005AFB1.charcache");
 				FILE *tpo = fopen(tpfn, "rb");
 				if (tpo)
 				{
@@ -1590,13 +1598,15 @@ bool cInterface::OnRender( IWindow & Window, double TimeSlice )
 
 				char tpfn[80];
 				size_t iCount = 0;
-				sprintf(tpfn, "%08X.charcache", m_CharList.Chars[i].GUID);
-				FILE *tpo = fopen(tpfn, "rb");
-				if (tpo != NULL)
-				{
+				snprintf(tpfn, 80, "%08X.charcache", (unsigned int)m_CharList.Chars[i].GUID);
+                FILE *tpo;
+                int retval = fopen_s(&tpo, tpfn, "rb");
+                if (!tpo || retval != 0) {
+                    OutputConsoleString("ERROR: Failed to open charcache file");
+                } else {
 					fread(&iCount, 4, 1, tpo);
 
-					for (DWORD i=0;i<iCount;i++)
+					for (DWORD j=0;j<iCount;j++)
 					{
 						stModelSwap tpm;
 						fread(&tpm, sizeof(stModelSwap), 1, tpo);
@@ -1604,7 +1614,7 @@ bool cInterface::OnRender( IWindow & Window, double TimeSlice )
 					}
 					
 					fread(&iCount, 4, 1, tpo);
-					for (DWORD i=0;i<iCount;i++)
+					for (DWORD j=0;j<iCount;j++)
 					{
 						stTextureSwap tpm;
 						fread(&tpm, sizeof(stTextureSwap), 1, tpo);
@@ -1612,7 +1622,7 @@ bool cInterface::OnRender( IWindow & Window, double TimeSlice )
 					}
 					
 					fread(&iCount, 4, 1, tpo);
-					for (DWORD i=0;i<iCount;i++)
+					for (DWORD j=0;j<iCount;j++)
 					{
 						stPaletteSwap tpm;
 						fread(&tpm, sizeof(stPaletteSwap), 1, tpo);
@@ -1719,7 +1729,8 @@ bool cInterface::OnRender( IWindow & Window, double TimeSlice )
 			DWORD dwCurLB = woMyself->GetLandblock();
 			woMyself->Unlock();
             // load landblocks within draw radius
-            m_World->LoadLandblocks(dwCurLB, m_iRenderRadius);
+            int numLandblocksLoaded = m_World->LoadLandblocks(dwCurLB, m_iRenderRadius);
+            OutputConsoleString("Loaded %d landblocks", numLandblocksLoaded);
 
             std::unordered_set<WORD>::iterator i = m_World->GetIterCurrentLandblocks();
             cLandblock *pLB = m_World->GetNextLandblock(i);

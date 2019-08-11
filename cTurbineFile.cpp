@@ -57,9 +57,10 @@ void cTurbineFile::LoadFile( std::string Filename )
 	char prefile[128];
 	FILETIME ftCreate, ftAccess, ftWrite;
 	GetFileTime(m_hFile, &ftCreate, &ftAccess, &ftWrite);
-	sprintf(prefile, "%s.pre", Filename.c_str());
-	FILE *preload = fopen(prefile, "rb");
-	if (preload)
+	snprintf(prefile, 128, "%s.pre", Filename.c_str());
+    FILE *preload = NULL;
+    int retval = fopen_s(&preload, prefile, "rb");
+	if (preload && retval != 0)
 	{
 		DWORD dwTimeLow, dwTimeHi;
 		fread(&dwTimeLow, 4, 1, preload);
@@ -86,8 +87,9 @@ void cTurbineFile::LoadFile( std::string Filename )
 		FindFiles( m_FileHeader.dwRootOffset, &LoadSet );
 
 		//Try to store preload for next time...
-		preload = fopen(prefile, "wb");
-		if (preload)
+        FILE *preload = NULL;
+        int retval = fopen_s(&preload, prefile, "wb");
+        if (preload && retval != 0)
 		{
 			fwrite(&ftWrite.dwLowDateTime, 4, 1, preload);
 			fwrite(&ftWrite.dwHighDateTime, 4, 1, preload);

@@ -254,8 +254,8 @@ void cCharInfo::LoadStatsTable()
 	{
 		SI.dwID = i;
 		SI.dwIcon = dwIcons[i-1];
-		SI.szDescription = szDescs[i-1];
-		SI.szName = szNames[i-1];
+        SI.szDescription.assign(szDescs[i - 1]);
+        SI.szName = std::string(szNames[i - 1]);
 
 		m_mStat[SI.dwID] = SI;
 	}

@@ -48,6 +48,7 @@ cThread::~cThread()
 void cThread::Start()
 {
 	m_bStopped = false;
+    // XXX: how do we handle exceptions from threaded functions?
 	m_hThread = CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE) ThreadProc, this, NULL, &m_dwThreadID);
 }
 

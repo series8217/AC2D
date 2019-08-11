@@ -131,9 +131,12 @@ void cModelGroup::UpdateAnim(float fTime)
 	for (int a=0;a<(int) m_vModels.size();a++)
 	{
 		float *flt = &m_fKeyData[iFrameNum*m_iNumParts*7];
-		flt += a*7;
-		m_vModels[a]->SetTranslation(cPoint3D(flt[0], flt[1], flt[2]));
-		m_vModels[a]->SetRotation(flt[3], flt[4], flt[5], flt[6]);
+        // XXX: something else is probably wrong with this, because original code didn't check a < m_iNumParts and overran the array.
+        if (a < m_iNumParts) {
+            flt += a * 7;
+            m_vModels[a]->SetTranslation(cPoint3D(flt[0], flt[1], flt[2]));
+            m_vModels[a]->SetRotation(flt[3], flt[4], flt[5], flt[6]);
+        }
 	}
 }
 

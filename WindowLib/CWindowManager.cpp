@@ -11,7 +11,6 @@ CWindowManager::CWindowManager()
 
 	Root.PrivateSetPosition( 0, 0 );
 	Root.PrivateSetSize( 1, 1 );
-
 	return;
 }
 

@@ -24,7 +24,7 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
         MessageBox(NULL, "No command line parameters were supplied", "Error!", MB_OK);
     }
     else {
-        MessageBox(NULL, lpCmdLine, "Commmand Line Parameters:", MB_OK);
+        //MessageBox(NULL, lpCmdLine, "Commmand Line Parameters:", MB_OK);
     }
 
 	hInst = hInstance;
@@ -152,7 +152,7 @@ void _ODS( const char *fmt, ... )
 	char szText[2048];
 	memset( szText, 0, 2048 );
 
-	_vsnprintf( szText, 2048, fmt, valist );
+	_vsnprintf_s( szText, 2048, fmt, valist );
 
 	OutputDebugString( szText );
 

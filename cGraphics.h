@@ -14,7 +14,7 @@ public:
 	void Resize();
 
 private:
-	void EnableOpenGL();
+	int EnableOpenGL();
 	void DisableOpenGL();
 
 	cInterface *m_Interface;

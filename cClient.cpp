@@ -42,8 +42,8 @@ cClient::~cClient()
 void cClient::Run()
 {
 	//Initialize Classes
-	m_Graphics = new cGraphics(m_hWnd);
-	m_Interface = new cInterface();
+    m_Graphics = new cGraphics(m_hWnd);
+    m_Interface = new cInterface();
     m_World = new cWorld();
 	m_CharInfo = new cCharInfo();
 	m_Network = new cNetwork();
@@ -55,7 +55,6 @@ void cClient::Run()
 	m_Interface->SetNetwork(m_Network);
 	m_Network->SetInterface(m_Interface);
 	m_Graphics->SetInterface(m_Interface);
-
 	
 	m_Interface->SetCharInfo(m_CharInfo);
 	m_Network->SetCharInfo(m_CharInfo);
@@ -72,6 +71,7 @@ void cClient::Run()
 	m_bInit = true;
 
 	//Run graphics.
+    // This runs "forever" until m_bQuit is set
 	m_Graphics->Run();
 }
 

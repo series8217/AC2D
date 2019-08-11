@@ -235,7 +235,7 @@ public:
       
 		int iMaxSkill = m_CharInfo->GetMaxSkill();
 
-		char textBuffer[64]; // XXX: this can be slimmed down to whatever the longest possible representation is from itoa
+		char textBuffer[64]; // XXX: this can be slimmed down to whatever the longest possible representation is from _itoa_s
 		for (int i=0; i<=iMaxSkill; i++)
 		{
 			if (!m_CharInfo->GetSkillValid(i))
@@ -245,7 +245,8 @@ public:
 			if (Sk->dwTrained != m_ttList[i])
 				bNeedResize = true;
 
-			m_mVals[i]->SetText(itoa(Sk->dwBuffed, textBuffer, 10));
+            _itoa_s(Sk->dwBuffed, textBuffer, 10);
+			m_mVals[i]->SetText(textBuffer);
 			m_mVals[i]->SetTextColor((Sk->dwBase != Sk->dwBuffed) ? 0xFF6060 : 0xFFFFFF);
 		}
 
@@ -337,13 +338,13 @@ public:
 	}
 	bool RenderEventAbstractor< cStatWindow >::OnRender( IWindow & Window, double TimeSlice )
 	{
-		char textBuffer[64]; // XXX: this can be slimmed down to whatever the longest possible representation is from itoa
+		char textBuffer[64]; // XXX: this can be slimmed down to whatever the longest possible representation is from _itoa_s
 
 		for (int i=0; i<6; i++)
 		{
 			stStatInfo *SI = m_CharInfo->GetStat(i+1);
-
-			m_stVals[i].SetText(itoa(SI->dwBuffed, textBuffer, 10));
+            _itoa_s(SI->dwBuffed, textBuffer, 10);
+			m_stVals[i].SetText(textBuffer);
 			m_stVals[i].SetTextColor((SI->dwBase != SI->dwBuffed) ? 0xFF6060 : 0xFFFFFF);
 		}
 
@@ -351,7 +352,8 @@ public:
 		{
 			stSecStatInfo *SI = m_CharInfo->GetSecStat((i+1) << 1);
 
-			m_stVals[i+6].SetText(itoa(SI->dwBuffed, textBuffer, 10));
+            _itoa_s(SI->dwBuffed, textBuffer, 10);
+			m_stVals[i+6].SetText(textBuffer);
 			m_stVals[i+6].SetTextColor((SI->dwBase != SI->dwBuffed) ? 0xFF6060 : 0xFFFFFF);
 		}
 
@@ -375,7 +377,6 @@ public:
 	{
 		m_iSelBar = 0;
 		m_iSelIndex = 0;
-
 		m_iLastCnt = 0;
 		m_iLastScroll = 0;
 
@@ -390,7 +391,6 @@ public:
 		m_sbScroll.SetMin(0);
 		m_sbScroll.SetValue(m_iSelIndex);
 		AddChild(m_sbScroll);
-
 		m_pbSelSpell.SetSize(32, 32);
 		m_pbSelSpell.SetPosition(0, 16);
 		m_pbSelSpell.SetPicture(0x060011D2);
@@ -439,7 +439,7 @@ public:
 		AddResizeEventHandler( *(ResizeEventAbstractor< cSpellBar > *)this );
 		AddMouseEventHandler( *(MouseEventsAbstractor< cSpellBar > *)this );
 		AddRenderEventHandler( *(RenderEventAbstractor< cSpellBar > *)this );
-		
+
 //		m_pbSelSpell.AddMouseEventHandler( *(MouseEventsAbstractor< cSpellBar > *)this );
 //		m_pbCastSpell.AddMouseEventHandler( *(MouseEventsAbstractor< cSpellBar > *)this );
 		m_stCastSpell.AddMouseEventHandler( *(MouseEventsAbstractor< cSpellBar > *)this );
@@ -885,9 +885,9 @@ private:
 		return true;
 	}
 public:
-	void SetPlayerPosition(cPoint3D NewPos, float fRotation)
+	void SetPlayerPosition(cPoint3D PlayerPos, float fRotation)
 	{
-		m_p3dPosition = NewPos;
+        m_p3dPosition = PlayerPos;
 		m_fRotation = fRotation;
 
 		m_pbCursor.SetPosition(m_pbMap.GetWidth()*((m_p3dPosition.x+101.95f)/(2*101.95f)) - 5, m_pbMap.GetHeight()*((-m_p3dPosition.y+101.95f)/(2*101.95f)) - 5);
@@ -898,7 +898,7 @@ public:
 		char coords[50], ns[2] = { 'N', 0 }, ew[2] = { 'E', 0 };
 		if (m_p3dPosition.x < 0) ew[0] = 'W';
 		if (m_p3dPosition.y < 0) ns[0] = 'S';
-		_snprintf(coords, 50, "Minimap - %3.2f%s %3.2f%s", fabs(m_p3dPosition.y), ns, fabs(m_p3dPosition.x), ew);
+		_snprintf_s(coords, 50, "Minimap - %3.2f%s %3.2f%s", fabs(m_p3dPosition.y), ns, fabs(m_p3dPosition.x), ew);
 		SetTitle(coords);
 	}
 private:
@@ -1183,7 +1183,7 @@ private:
 			stSecStatInfo *tpVital = m_CharInfo->GetSecStat(i);
 
 			char tpstr[50];
-			sprintf(tpstr, "%i/%i", tpVital->dwCurrent, tpVital->dwBuffed);
+			snprintf(tpstr, 50, "%i/%i", (int)tpVital->dwCurrent, (int)tpVital->dwBuffed);
 			m_stVitals[(i >> 1) - 1].SetText(tpstr);
 			m_pbVitals[(i >> 1) - 1].SetLimits(0, (float) tpVital->dwBuffed);
 			m_pbVitals[(i >> 1) - 1].SetCurrent((float) tpVital->dwCurrent);

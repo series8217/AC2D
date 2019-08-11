@@ -235,6 +235,7 @@ public:
 
 		AddRenderEventHandler( *(RenderEventAbstractor< cMovableWindow > *)this );
 		AddMouseEventHandler( *(MouseEventsAbstractor< cMovableWindow > *)this );
+
 	}
 	~cMovableWindow()
 	{

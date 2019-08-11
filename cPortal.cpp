@@ -35,10 +35,11 @@ cPortal::cPortal()
 	TCHAR szEXEPathname[_MAX_PATH];
 	GetModuleFileName(NULL, szEXEPathname, _MAX_PATH);
 	*(strrchr(szEXEPathname, '\\')+1) = 0;
-	strcat(szEXEPathname, "client_highres.dat");
+	strncat_s(szEXEPathname, "client_highres.dat", _MAX_PATH);
 
-	FILE *ftest = fopen(szEXEPathname,"rb");
-	if (ftest)
+    FILE *ftest = NULL;
+    int retval = fopen_s(&ftest, szEXEPathname, "rb");
+	if (ftest && retval == 0)
 	{
 		fclose(ftest);
 		m_tfPortalHighRes = new cTurbineFile();
@@ -238,6 +239,7 @@ DWORD cPortal::FindGraphic(DWORD ID, std::vector<stPaletteSwap> *vPaletteSwaps, 
 		//Padding will be required, unfortunately...
 		BYTE *tex = new BYTE[sizeX2*sizeY2*4];
 		ZeroMemory(tex, sizeX2*sizeY2*4);
+        BYTE *texDataStart = pfUI->data + 24;
 
 		for (DWORD y=0;y<sizeY2;y++)
 		{
@@ -250,7 +252,10 @@ DWORD cPortal::FindGraphic(DWORD ID, std::vector<stPaletteSwap> *vPaletteSwaps, 
 					{
 						case 0x14:
 						case 0xF3:				//RGB (24-bit color)
-							*((DWORD *) &tex[4*sizeX2*y + x*4]) = *((DWORD *) (pfUI->data+24+(3*(sizeX*y+x)))) | 0xFF000000;
+                            // XXX: buffer overrun here... or reading outside of pfUI data
+                            // XXX: original is = *((DWORD *) (pfUI->data+24+(3*(sizeX*y+x)))) | 0xFF000000;
+                            // XXX: to avoid overrun set it to = texDataStart[3*(sizeX*y+x)] << 24;
+                            *((DWORD *)&tex[4 * sizeX2*y + x * 4]) = *((DWORD *)(pfUI->data + 24 + (3 * (sizeX*y + x)))) | 0xFF000000;
 							break;
 						case 0x15:				//RGBA (32-bit color)
 							*((DWORD *) &tex[4*sizeX2*y + x*4]) = *((DWORD *) (pfUI->data+24+(4*(sizeX*y+x))));

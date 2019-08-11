@@ -15,15 +15,19 @@ typedef unsigned __int64 QWORD;
 //#define TerrainOnly
 
 
-
 #define WIN32_LEAN_AND_MEAN		// Exclude rarely-used stuff from Windows headers
 // Windows Header Files:
 //#include "malloc.h"
 #include <windows.h>
 // C RunTime Header Files
+#define _CRTDBG_MAPALLOC
+#define _CRTDBG_MAP_ALLOC
 #include <stdlib.h>
-#include <malloc.h>
-#include <memory.h>
+#include <crtdbg.h>
+
+
+//#include <malloc.h>
+//#include <memory.h>
 #include <tchar.h>
 
 #include <gl/gl.h>														// Header File For The OpenGL32 Library
@@ -41,13 +45,22 @@ typedef unsigned __int64 QWORD;
 #include <list>
 #include <map>
 #include <string>
-#include <winsock2.h>
 #include "zlib\zlib.h"
 
-#define _CRTDBG_MAPALLOC
-#define _CRTDBG_MAP_ALLOC
-#include <stdlib.h>
-#include <crtdbg.h>
+#include <assert.h>
+
+// Target vista or later, to support InetNtop
+#include <SdkDdkver.h>
+#define NTDDI_VERSION NTDDI_VISTA
+#define WINVER _WIN32_WINNT_VISTA
+#define _WIN32_WINNT _WIN32_WINNT_VISTA
+#include <winsock2.h>
+#include <ws2tcpip.h>
+
+#define DETECT_AND_HALT_ON_HEAP_CORRUPTION(...)     {}
+//_ASSERTE( _CrtCheckMemory( ) );
+
+
 #define NEW_INLINE_WORKAROUND new ( _NORMAL_BLOCK ,\
                                     __FILE__ , __LINE__ )
 #define new NEW_INLINE_WORKAROUND
@@ -182,8 +195,9 @@ public:
 	}
 	void Dump(char *Filename)
 	{
-		FILE *out = fopen(Filename,"wb");
-		if (out)
+        FILE *out;
+        int retval = fopen_s(&out, Filename, "wb");
+		if (out && retval == 0)
 		{
 			fwrite(data, length, 1, out);
 //		for (int i=3;i<pf->length;i+=4)

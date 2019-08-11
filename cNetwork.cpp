@@ -55,6 +55,7 @@ cNetwork::cNetwork()
 	iConnPacketCount = 0;
 
 	m_dwNextConnectionTimeout = 0; // ignored when zero
+    m_dwNextServerAliveTimeout = 0; // ignored when zero
 
 	bPortalMode = false;
 
@@ -70,7 +71,8 @@ cNetwork::cNetwork()
 	m_dwStartTicks = GetTickCount();
 
 	m_zTicketSize = 0;
-	char acServerIP[32];
+#define SERVER_IP_CHARS_MAX 64
+	char acServerIP[SERVER_IP_CHARS_MAX];
 	int acServerPort = 0;
 
 	/* parse command line arguments */
@@ -87,7 +89,7 @@ cNetwork::cNetwork()
 			case 'h':
 			{
 				if (arg + 1 < __argc) {
-					strcpy(acServerIP, __argv[arg + 1]);
+					strncpy_s(acServerIP, __argv[arg + 1], SERVER_IP_CHARS_MAX-1);
 					if (strchr(acServerIP, ':') != NULL) {
 						acServerPort = atoi(strchr(acServerIP, ':') + 1);
 						*strchr(acServerIP, ':') = 0;
@@ -109,11 +111,11 @@ cNetwork::cNetwork()
 			{
 				if (arg + 1 < __argc) {
 					ZeroMemory(m_zAccountName, ACCOUNTNAME_SIZE);
-					strcpy(m_zAccountName, __argv[arg + 1]);
+					strncpy_s(m_zAccountName, __argv[arg + 1], ACCOUNTNAME_SIZE-1);
 					// check if password is provided
 					char* password_index = strchr(m_zAccountName, ':');
 					if (password_index != NULL) {
-						strcpy(m_zPassword, password_index + 1);
+						strncpy_s(m_zPassword, password_index + 1, PASSWORD_SIZE-1);
 						// end account name string at the colon
 						*password_index = 0;
 					}
@@ -127,7 +129,7 @@ cNetwork::cNetwork()
 			{
 				if (arg + 1 < __argc) {
 					ZeroMemory(m_zPassword, PASSWORD_SIZE);
-					strcpy(m_zPassword, __argv[arg + 1]);
+					strncpy_s(m_zPassword, __argv[arg + 1], PASSWORD_SIZE-1);
 				}
 				break;
 			}
@@ -153,7 +155,7 @@ cNetwork::cNetwork()
 	}
 
 	m_siLoginServer.m_saServer.sin_family = AF_INET;
-	m_siLoginServer.m_saServer.sin_addr.s_addr = inet_addr(acServerIP);
+    InetPton(m_siLoginServer.m_saServer.sin_family, acServerIP, &m_siLoginServer.m_saServer.sin_addr);
 	m_siLoginServer.m_wBasePort = acServerPort;
 	m_siLoginServer.m_qwCookie = 0;
 	m_siLoginServer.serverXorGen = NULL;
@@ -206,6 +208,7 @@ void cNetwork::Reset()
 		(*i).m_lSentPackets.clear();//Not really necessary?
 	}
 	m_siWorldServers.clear();
+    m_pActiveWorld = NULL;
 
 	m_dwStartTicks = GetTickCount();
 	m_dwGameEventOut = 0;
@@ -214,6 +217,7 @@ void cNetwork::Reset()
 	m_dwFragmentSequenceOut = 0;
 
 	m_dwNextConnectionTimeout = 0;
+    m_dwNextServerAliveTimeout = 0;
 }
 
 static DWORD checksum(const void* data, size_t size)
@@ -413,13 +417,15 @@ void cNetwork::SendLSPacket(cPacket *Packet, bool IncludeSeq, bool IncrementSeq)
 void cNetwork::SendLostPacket(int iSendSequence, stServerInfo *Target)
 {
 	Lock();
+    char addr_str[128];
 	for (std::list<cPacket *>::iterator i = Target->m_lSentPackets.begin(); i != Target->m_lSentPackets.end(); i++)
 	{
 		cPacket *Packet = *i;
 		if (Packet->GetTransit()->m_dwSequence == iSendSequence)
 		{
+            InetNtop(Target->m_saServer.sin_family, &Target->m_saServer.sin_addr, addr_str, 128);
 			//Match
-			m_Interface->OutputConsoleString("Resending %X (%X) on %s", iSendSequence, Packet->GetTransit()->m_dwFlags, inet_ntoa(Target->m_saServer.sin_addr));
+			m_Interface->OutputConsoleString("Resending %X (%X) on %s", iSendSequence, Packet->GetTransit()->m_dwFlags, addr_str);
 			if (Packet->GetTransit()->m_dwFlags & 0x200)
 			{
 				Packet->GetTransit()->m_wTime = GetTime();
@@ -443,7 +449,8 @@ void cNetwork::SendLostPacket(int iSendSequence, stServerInfo *Target)
 	}
 
 	Unlock();
-	m_Interface->OutputConsoleString("Couldn't resend %X on server %s, packet not found!", iSendSequence, inet_ntoa(Target->m_saServer.sin_addr));
+    InetNtop(Target->m_saServer.sin_family, &Target->m_saServer.sin_addr, addr_str, 50);
+	m_Interface->OutputConsoleString("Couldn't resend %X on server %s, packet not found!", iSendSequence, addr_str);
 }
 
 void cNetwork::SendPacket(cPacket *Packet, stServerInfo *Target)
@@ -687,7 +694,7 @@ void cNetwork::Run()
             Connect();
 		}
 
-		//keep trying to connect to login server if first time doesn't work
+		// keep trying to connect to login server if first time doesn't work
 		if (!(m_siLoginServer.m_dwFlags & SF_CONNECTED))
 		{
 			// timeout trying to connect
@@ -697,7 +704,14 @@ void cNetwork::Run()
 				m_Interface->OutputConsoleString("Couldn't connect first time, trying again..");
 				Connect();
 			}
-		}
+        }
+        else {
+            // stopped receiving messages from server
+            if (m_dwNextServerAliveTimeout > 0 && m_dwNextServerAliveTimeout < GetTickCount()) {
+                m_Interface->OutputConsoleString("Timed out. No server packet received for >%d ms.", TIMEOUT_CONNECT_MS);
+                Connect();
+            }
+        }
 
 		// when m_dwNextConnectionTimeout is nonzero, it's the connection timeout
 		if (m_dwNextConnectionTimeout > 0 && m_dwNextConnectionTimeout < GetTickCount()) {
@@ -708,8 +722,8 @@ void cNetwork::Run()
 		}
 
 		// check if there is a packet waiting
-        memcpy(&m_readfds, &m_masterfds, sizeof(fd_set));
-		int select_retval = select(m_sSocket + 1, &m_readfds, NULL, NULL, &m_socketTimeout);
+        memcpy(&m_readfds, &m_masterfds, sizeof(FD_SET));
+        int select_retval = select(m_sSocket + 1, &m_readfds, NULL, NULL, &m_socketTimeout);
 		if (select_retval < 0) {
 			int errorCode = WSAGetLastError();
 			m_Interface->OutputConsoleString("ERROR ON SELECT: %d", errorCode);
@@ -771,8 +785,8 @@ void cNetwork::ReceivePacket(){
 	}
 
 	if (verifiedServer != NULL) {
-		// disable any timeout
-		m_dwNextConnectionTimeout = 0;
+		// update server connection timeout
+		m_dwNextServerAliveTimeout = GetTickCount() + TIMEOUT_SERVER_MS;
 		ProcessPacket(Packet, verifiedServer);
 		if (verifiedServer->m_dwLastPacketAck + ACK_INTERVAL_MS < GetTickCount()) {
 			SendAckPacket(verifiedServer);
@@ -781,14 +795,14 @@ void cNetwork::ReceivePacket(){
 	else {
 		/** We didn't recognize the packet source. Dump some info to the console for troubleshooting purposes. */
 		SOCKADDR_IN *tp = (SOCKADDR_IN *)&Target;
-
-		char tps[50];
-		char *tps2 = inet_ntoa(m_siLoginServer.m_saServer.sin_addr);
-		strcpy(tps, tps2);
+        char in_tps[50];
+        InetNtop(tp->sin_family, &tp->sin_addr, in_tps, 50);
+		char server_tps[50];
+        InetNtop(m_siLoginServer.m_saServer.sin_family, &m_siLoginServer.m_saServer.sin_addr, server_tps, 50);
 		m_Interface->OutputConsoleString("Received packet from unknown server: %s:%i.  Login server: %s:%i"
-			, inet_ntoa(tp->sin_addr)
+			, in_tps
 			, (int)ntohs(tp->sin_port)
-			, tps
+			, server_tps
 			, (int)ntohs(m_siLoginServer.m_saServer.sin_port));
 		m_Interface->OutputConsoleString("World servers:");
 		DumpWorldServerList();
@@ -1006,7 +1020,8 @@ void cNetwork::ProcessPacket(cPacket *Packet, stServerInfo *Server)
 
 		time_t sT = (DWORD)serverTime;
 		time_t offset = time(NULL) - sT;
-		char *woohoo = ctime(&offset);
+        char woohoo[128];
+        ctime_s(woohoo, 128, &offset);
 
 		Server->m_dwLastSyncRecv = GetTickCount();
 		Server->m_flServerTime = serverTime;
@@ -1497,16 +1512,16 @@ void cNetwork::ProcessWSPacket(cPacket *Packet, stServerInfo *Server)
 	//		m_Interface->OutputConsoleString("WS: Unknown Packet Type: %08X", dwType);
 	//		break;
 	//	}
-
-	delete Packet;
 }
 
 void cNetwork::Stop()
 {
+    Lock();
 	Disconnect();
 	WSACleanup();
 	closesocket(m_sSocket);
 	cThread::Stop();
+    Unlock();
 }
 
 void cNetwork::ServerLoginError(DWORD Error)
@@ -1616,7 +1631,7 @@ void cNetwork::ServerCharacterError(DWORD Error)
 		break;
 	default:
 		char buf[128];
-		sprintf(buf, "Unrecognized server error code: #%d", Error);
+		snprintf(buf, 128, "Unrecognized server error code: #%d", (int)Error);
 		MessageBox(NULL, buf, "Unrecognized error code:", MB_OK);
 		break;
 	}
@@ -1960,7 +1975,7 @@ void cNetwork::ProcessMessage(cMessage *Msg, stServerInfo *Server)
 			stCharList::CharInfo tpChar;
 			tpChar.GUID = Msg->ReadDWORD();				//character
 			char *tpName = Msg->ReadString();			//name
-			strcpy(tpChar.Name, tpName);
+			strncpy_s(tpChar.Name, tpName, 64-1);
 			delete[]tpName;
 			tpChar.DelTimeout = Msg->ReadDWORD();		//deleteTimeout
 			CharList.Chars.push_back(tpChar);
@@ -2006,9 +2021,13 @@ void cNetwork::ProcessMessage(cMessage *Msg, stServerInfo *Server)
 
 			char tpfn[80];
 			size_t iCount;
-			sprintf(tpfn, "%08X.charcache", tpObj->GetGUID());
-			FILE *tpo = fopen(tpfn, "wb");
-
+			snprintf(tpfn, 80, "%08X.charcache", (int)tpObj->GetGUID());
+            FILE *tpo;
+            int retval = fopen_s(&tpo, tpfn, "wb");
+            if (!tpo || retval != 0) {
+                m_Interface->OutputConsoleString("ERROR: Failed to open cache file for writing.");
+                break;
+            }
 			iCount = mod->size(); fwrite(&iCount, 4, 1, tpo);
 			for (DWORD i = 0;i < iCount;i++)
 				fwrite(&(*mod)[i], sizeof(stModelSwap), 1, tpo);
@@ -2429,15 +2448,15 @@ void cNetwork::ProcessMessage(cMessage *Msg, stServerInfo *Server)
 					char linebuff[128]; memset(linebuff, 0, 128);
 					char strbuff[128]; memset(strbuff, 0, 128);
 
-					strcat(strbuff, "; ");
+					strncat_s(strbuff, "; ", 128);
 					for (int j = i * 16; (j < ((i + 1) * 16)) && (j < dataSize); j++)
 					{
-						sprintf(valbuff, "%.1s", &data[j]);
-						strcat(strbuff, valbuff);
-						sprintf(valbuff, "%02X ", data[j]);
-						strcat(linebuff, valbuff);
+						snprintf(valbuff, 128, "%.1s", &data[j]);
+						strncat_s(strbuff, valbuff, 128);
+						snprintf(valbuff, 128, "%02X ", data[j]);
+						strncat_s(linebuff, valbuff, 128);
 					}
-					strcat(linebuff, strbuff);
+					strncat_s(linebuff, strbuff, 128);
 					m_Interface->OutputConsoleString("%s", linebuff);
 				}
 				break;
@@ -2538,15 +2557,15 @@ void cNetwork::ProcessMessage(cMessage *Msg, stServerInfo *Server)
 			char linebuff[128]; memset(linebuff, 0, 128);
 			char strbuff[128]; memset(strbuff, 0, 128);
 
-			strcat(strbuff, "; ");
+			strncat_s(strbuff, "; ", 128);
 			for (int j = i * 16; (j < ((i + 1) * 16)) && (j < dataSize); j++)
 			{
-				sprintf(valbuff, "%.1s", &data[j]);
-				strcat(strbuff, valbuff);
-				sprintf(valbuff, "%02X ", data[j]);
-				strcat(linebuff, valbuff);
+				snprintf(valbuff, 128, "%.1s", &data[j]);
+				strncat_s(strbuff, valbuff, 128);
+				snprintf(valbuff, 128, "%02X ", data[j]);
+				strncat_s(linebuff, valbuff, 128);
 			}
-			strcat(linebuff, strbuff);
+			strncat_s(linebuff, strbuff, 128);
 			m_Interface->OutputConsoleString("%s", linebuff);
 		}
 		break;
@@ -2908,9 +2927,10 @@ stServerInfo * cNetwork::AddWorldServer(SOCKADDR_IN NewServer)
 
 	m_siWorldServers.push_back(tpNewServer);
 
-
+    char addr_str[128];
+    InetNtop(tpNewServer.m_saServer.sin_family, &tpNewServer.m_saServer.sin_addr, addr_str, 128);
 	m_Interface->OutputConsoleString("Added World Server: %s:%i",
-		inet_ntoa(tpNewServer.m_saServer.sin_addr),
+		addr_str,
 		(int)ntohs(tpNewServer.m_saServer.sin_port));
 
 	Unlock();
@@ -2920,9 +2940,11 @@ stServerInfo * cNetwork::AddWorldServer(SOCKADDR_IN NewServer)
 
 
 void cNetwork::DumpWorldServerList() {
+    char addr_str[128];
 	for (std::list<stServerInfo>::iterator i = m_siWorldServers.begin(); i != m_siWorldServers.end(); i++)
 	{
-		m_Interface->OutputConsoleString("World server #%d -- %s:%d", i, inet_ntoa((*i).m_saServer.sin_addr), (int)ntohs((*i).m_saServer.sin_port));
+        InetNtop((*i).m_saServer.sin_family, &(*i).m_saServer.sin_addr, addr_str, 128);
+		m_Interface->OutputConsoleString("World server #%d -- %s:%d", i, addr_str, (int)ntohs((*i).m_saServer.sin_port));
 	}
 }
 
@@ -2931,8 +2953,11 @@ void cNetwork::SetActiveWorldServer(SOCKADDR_IN NewServer)
 {
 	bool foundServer = false;
 
+    char addr_str[128];
+    InetNtop(NewServer.sin_family, &NewServer.sin_addr, addr_str, 128);
+
 	m_Interface->OutputConsoleString("Selecting World Server: %s:%i...",
-		inet_ntoa(NewServer.sin_addr),
+		addr_str,
 		(int)ntohs(NewServer.sin_port));
 
 	Lock();

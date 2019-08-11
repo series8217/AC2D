@@ -263,8 +263,8 @@ void cLandblock::LoadObjectBlock(DWORD *dwLB) {
                 tpl.bHeading = pBS2.ReadFloat();
                 tpl.cHeading = pBS2.ReadFloat();
                 tpl.landblock = *dwLB;
-                cPoint3D tp3d;
-                tp3d.CalcFromLocation(&tpl);
+                cPoint3D translation_point3d;
+                translation_point3d.CalcFromLocation(&tpl);
 
                 cModelGroup *Model = new cModelGroup();
                 if (!Model->ReadModel(dwModelID))
@@ -274,7 +274,7 @@ void cLandblock::LoadObjectBlock(DWORD *dwLB) {
                     //				OutputConsoleString("Failed model load: %08X", dwModelID);
                 }
                 Model->SetScale(MODEL_SCALE_FACTOR);
-                Model->SetTranslation(tp3d);
+                Model->SetTranslation(translation_point3d);
                 Model->SetRotation(tpl.wHeading, tpl.aHeading, tpl.bHeading, tpl.cHeading);
                 Models.push_back(Model);
             }
@@ -406,7 +406,7 @@ int cLandblock::Draw()
 		fYCorner = (float) ((((dwBlockY+1.00f) * 8.0f) - 1027.5) / 10.0f);
 	}
 
-	float fDiv = (1.0/ MODEL_SCALE_FACTOR) / 2.0;
+	float fDiv = (1.0f/ MODEL_SCALE_FACTOR) / 2.0f;
     glPushName(0xDEADBEEF);
 
 	for (int y=0;y<CELLDIM;y++)
@@ -515,6 +515,6 @@ int cLandblock::Draw()
 				glRasterPos3f(fXCorner + x/10.0f, fYCorner + y/10.0f, vertexHeights[x][y]/fDiv);
 
 				char lele[50];
-				sprintf(lele, "%02X - %08X - %04X", type0, texnum[type0], m_lbCell.wTopo[x][y]);
+				snprintf(lele, 50, "%02X - %08X - %04X", type0, texnum[type0], m_lbCell.wTopo[x][y]);
 				glCallLists(strlen(lele), GL_UNSIGNED_BYTE, lele); 
 			}*/

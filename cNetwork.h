@@ -29,7 +29,7 @@ const float max_sidestep_anim_rate	= 3.0f;
 // enter world timeout
 #define TIMEOUT_ENTER_GAME_MS 5000
 // timeout after connection established
-#define TIMEOUT_SERVER_MS 5000
+#define TIMEOUT_SERVER_MS 10000
 // Interval between ack messages sent by us
 #define ACK_INTERVAL_MS 2000
 // Interval between player location updates sent client to server
@@ -236,6 +236,7 @@ private:
 	DWORD m_dwGameEventOut;
 
     DWORD m_dwNextConnectionTimeout;
+    DWORD m_dwNextServerAliveTimeout;
 
 	stServerInfo m_siLoginServer;
 	std::list <stServerInfo> m_siWorldServers;

@@ -121,7 +121,7 @@ char*	cByteStream::ReadString()	{
 
 wchar_t* cByteStream::ReadWString()	{
 	WORD wStrLen = ReadWORD();
-	wchar_t* Result = new wchar_t[wStrLen+1];
+	wchar_t* Result = new wchar_t[(2*wStrLen)+1];
 	Result[wStrLen] = 0;
 
 	memcpy(Result, m_pbDataPtr, 2*wStrLen);

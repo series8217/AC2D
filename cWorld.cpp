@@ -5,7 +5,9 @@
 
 cWorld::cWorld()
 {
-    
+    m_mLandblocks.clear();
+    m_mCurrentLandblocks.clear();
+    m_mNeedToLoadBlocks.clear();
 }
 
 cWorld::~cWorld()
@@ -14,20 +16,23 @@ cWorld::~cWorld()
         delete i->second;
 }
 
-void cWorld::LoadLandblocks()
+int cWorld::LoadNeededLandblocks()
 {
     //	OutputString(eYellow, "Loading Landblocks...");
+    int numLandblocks = 0;
 
     for (std::unordered_set<WORD>::iterator i = m_mNeedToLoadBlocks.begin(); i != m_mNeedToLoadBlocks.end(); i++)
     {
         cLandblock *pLB = new cLandblock();
         pLB->Load(*i);
         m_mLandblocks[*i] = pLB;
+        numLandblocks++;
     }
 
     m_mNeedToLoadBlocks.clear();
 
     //	OutputString(eYellow, "Done Loading.");
+    return numLandblocks;
 }
 
 std::unordered_set<WORD>::iterator cWorld::GetIterCurrentLandblocks() {
@@ -44,14 +49,13 @@ cLandblock *cWorld::GetNextLandblock(std::unordered_set<WORD>::iterator &i) {
     if (m_mLandblocks.find(*i) != m_mLandblocks.end())
     {
         pLB = m_mLandblocks.find(*i)->second;
-
     }
     i++;
     return pLB;
 }
 
-void cWorld::LoadLandblocks(DWORD dwCurrentLandblock, int renderRadius) {
-
+int cWorld::LoadLandblocks(DWORD dwCurrentLandblock, int renderRadius) {
+    int numLandblocks = 0;
     DWORD LBX = (dwCurrentLandblock >> 24) & 0xFF;
     DWORD LBY = (dwCurrentLandblock >> 16) & 0xFF;
 
@@ -73,9 +77,10 @@ void cWorld::LoadLandblocks(DWORD dwCurrentLandblock, int renderRadius) {
     }
 
     if (m_mNeedToLoadBlocks.size()) {
-        LoadLandblocks();
+        numLandblocks = LoadNeededLandblocks();
     }
 
+    return numLandblocks;
 
 }
 

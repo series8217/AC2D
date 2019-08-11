@@ -84,8 +84,8 @@ bool cModel::ReadDungeonPart(DWORD dwDungeon, WORD wDungeonPart, std::vector<WOR
 		pBS.ReadDWORD();	//unk2
 		NewModel.iNumVerts = (int) pBS.ReadDWORD();
 
-		for (std::vector<WORD>::iterator i = v_Textures->begin(); i != v_Textures->end(); i++)
-			NewModel.m_Textures.push_back(0x08000000 | *i);
+		for (std::vector<WORD>::iterator t = v_Textures->begin(); t != v_Textures->end(); t++)
+			NewModel.m_Textures.push_back(0x08000000 | *t);
 
 		NewModel.m_Vertices = new cACVertex[NewModel.iNumVerts];
 		for (int h=0; h<NewModel.iNumVerts; h++)
@@ -305,6 +305,7 @@ bool cModel::ParsePreModel(cACPreModel * pModel)
 		}
 		if ((flags & 2) || (flags & 4))
 		{
+            // XXX: this was already declared above -- is it supposed to be the same thing?
 			DWORD dwTexture = pBSTex.ReadDWORD();
 			//This used to be palette, but no longer makes any sense since palettes are embedded in the file...
 			DWORD dwPalette = pBSTex.ReadDWORD();
@@ -320,13 +321,13 @@ bool cModel::ParsePreModel(cACPreModel * pModel)
 			//textureswap
 			if (pModel->m_bSwaps)
 			{
-				for (std::vector<stTextureSwap>::iterator i = pModel->vTextureSwaps->begin(); i != pModel->vTextureSwaps->end(); i++)
+				for (std::vector<stTextureSwap>::iterator t = pModel->vTextureSwaps->begin(); t != pModel->vTextureSwaps->end(); t++)
 				{
-					if (i->modelIndex == pModel->iSwapModelNum)
+					if (t->modelIndex == pModel->iSwapModelNum)
 					{
-						if (i->oldTexture == (dwTexture & 0xFFFF))
+						if (t->oldTexture == (dwTexture & 0xFFFF))
 						{
-							dwTexture = (*i).newTexture | 0x05000000;
+							dwTexture = (*t).newTexture | 0x05000000;
 							break;
 						}
 					}

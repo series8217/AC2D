@@ -19,8 +19,8 @@ public:
 
     void AddLandblock(cPortalFile *NewLB);
 
-    void LoadLandblocks();
-    void LoadLandblocks(DWORD dwCurrentLandblock, int renderRadius);
+    int LoadNeededLandblocks();
+    int LoadLandblocks(DWORD dwCurrentLandblock, int renderRadius);
     bool FindLandblocks(FILE *cell, DWORD dirPos);
 
     std::unordered_set<WORD>::iterator GetIterCurrentLandblocks();
