@@ -1730,7 +1730,7 @@ bool cInterface::OnRender( IWindow & Window, double TimeSlice )
 			woMyself->Unlock();
             // load landblocks within draw radius
             int numLandblocksLoaded = m_World->LoadLandblocks(dwCurLB, m_iRenderRadius);
-            OutputConsoleString("Loaded %d landblocks", numLandblocksLoaded);
+            //OutputConsoleString("Loaded %d landblocks", numLandblocksLoaded);
 
             std::unordered_set<WORD>::iterator i = m_World->GetIterCurrentLandblocks();
             cLandblock *pLB = m_World->GetNextLandblock(i);
