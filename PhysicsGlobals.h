@@ -8,6 +8,8 @@ namespace Physics
     {
         const float EPSILON = 0.00019999999f;
 
+        const float EpsilonSq = EPSILON * EPSILON;
+
         const float Gravity = -9.8000002f;
 
         const float DefaultFriction = 0.94999999f;
