@@ -43,7 +43,6 @@ cInterface::cInterface()
 	
     // XXX: where does this starting value come from?
 	FlyerCenter = cPoint3D(93.45f, -82.15f, 0.85f);
-//	FlyerCenter = cPoint3D(0, 0, 5);
 	bRotatingCamera = false;
 
 	m_dwCurSelect = 0;
@@ -385,8 +384,15 @@ int cInterface::Draw(RECT rRect, HDC hDC)
 	float fTimeDiff = (float) (liTemp.QuadPart - liLast.QuadPart)/liFreq.QuadPart;
 	liLast = liTemp;
 
-    // update positions of objects (this include updating character position based on control inputs)
+    // update positions of objects based on velocity, etc.
 	m_World->UpdateObjects(fTimeDiff);
+
+	if (bMotionUpdate)
+	{
+		bMotionUpdate = false;
+		// XXX: should this be before UpdateObjects and SendPositionUpdate????
+		UpdatePlayerMoveState();
+	}
 
 	//check for message sending
 	//XXX: nuke this asap...
@@ -421,69 +427,6 @@ int cInterface::Draw(RECT rRect, HDC hDC)
             }
             m_dwLastLocationUpdate = GetTickCount();
         }
-	}
-
-	if (bMotionUpdate)
-	{
-        bMotionUpdate = false;
-
-        //Update velocity info
-        // XXX: should this be before UpdateObjects and SendPositionUpdate????
-        cWObject *woMyself = m_World->FindObject(m_dwSelChar);
-        if (woMyself) {
-            float fRunSpeed = 1.0f;
-            float fSpeedScale = 1.0f;
-            float fForwardSpeed = 1.0f;
-            float fSidestepSpeed = 1.0f;
-
-            stInternalSkill *Sk = m_CharInfo->GetSkillInfo(Skill::Run);
-            if (Sk != NULL) {
-                // TODO: burdened runrate
-                fRunSpeed = Physics::MovementSystem::GetRunRate(0.0f, (int)Sk->dwBase, 1.0f);
-            }
-            if (m_MotionControlsState.walk) {
-                fRunSpeed = 1.0f;
-            }
-
-
-		    int iFB = 0, iStrafe = 0, iTurn = 0;
-
-		    if (m_MotionControlsState.forward)
-			    iFB++;
-		    if (m_MotionControlsState.backward)
-			    iFB--;
-		    if (m_MotionControlsState.turnLeft)
-			    iTurn--;
-		    if (m_MotionControlsState.turnRight)
-			    iTurn++;
-		    if (m_MotionControlsState.sidestepLeft)
-			    iStrafe--;
-		    if (m_MotionControlsState.sidestepRight)
-			    iStrafe++;
-
-            // backwards speed is slower
-            if (iFB < 0) {
-                fForwardSpeed = 2.5f * 0.65f * fRunSpeed * fSpeedScale;
-            }
-            else {
-                fForwardSpeed = 2.5f * fRunSpeed * fSpeedScale;
-            }
-
-            // sidestep speed
-            fSidestepSpeed = fSpeedScale * fRunSpeed * 3.12f * 0.5f;
-
-		    m_Network->SendMoveUpdate(iFB, iStrafe, iTurn, !m_MotionControlsState.walk);
-
-            m_World->Lock();
-			woMyself->SetMoveVelocities(iFB*fForwardSpeed, iStrafe*fSidestepSpeed, iTurn*1.5f);
-            // process movement to update Location (not the same as Position -- Location is shared /w server!)
-            //XXX: stLocation *lPlayer = woMyself->GetLocation();
-            //XXX: stMoveInfo mPlayer = woMyself->GetMoveInfo();
-            //XXX: float fPlayerHeading = woMyself->GetHeading();
-            //XXX: lPlayer->xOffset -= -sin(fPlayerHeading);
-            //XXX: lPlayer->yOffset += -cos(fPlayerHeading);
-            m_World->Unlock();
-		}
 	}
 
 	//Default to 2d mode
@@ -524,6 +467,67 @@ int cInterface::Draw(RECT rRect, HDC hDC)
 
 //	Unlock();
 }
+
+
+void cInterface::UpdatePlayerMoveState() {
+	//Update velocity info
+	cWObject *woMyself = m_World->FindObject(m_dwSelChar);
+	if (woMyself) {
+		float fRunSpeed = 1.0f;
+		float fSpeedScale = 1.0f;
+		float fForwardSpeed = 1.0f;
+		float fSidestepSpeed = 1.0f;
+
+		stInternalSkill *Sk = m_CharInfo->GetSkillInfo(Skill::Run);
+		if (Sk != NULL) {
+			// TODO: burdened runrate
+			fRunSpeed = Physics::MovementSystem::GetRunRate(0.0f, (int)Sk->dwBase, 1.0f);
+		}
+		if (m_MotionControlsState.walk) {
+			fRunSpeed = 1.0f;
+		}
+
+
+		int iFB = 0, iStrafe = 0, iTurn = 0;
+
+		if (m_MotionControlsState.forward)
+			iFB++;
+		if (m_MotionControlsState.backward)
+			iFB--;
+		if (m_MotionControlsState.turnLeft)
+			iTurn--;
+		if (m_MotionControlsState.turnRight)
+			iTurn++;
+		if (m_MotionControlsState.sidestepLeft)
+			iStrafe--;
+		if (m_MotionControlsState.sidestepRight)
+			iStrafe++;
+
+		// backwards speed is slower
+		if (iFB < 0) {
+			fForwardSpeed = 2.5f * 0.65f * fRunSpeed * fSpeedScale;
+		}
+		else {
+			fForwardSpeed = 2.5f * fRunSpeed * fSpeedScale;
+		}
+
+		// sidestep speed
+		fSidestepSpeed = fSpeedScale * fRunSpeed * 3.12f * 0.5f;
+
+		m_Network->SendMoveUpdate(iFB, iStrafe, iTurn, !m_MotionControlsState.walk);
+
+		m_World->Lock();
+		woMyself->SetMoveVelocities(iFB*fForwardSpeed, iStrafe*fSidestepSpeed, iTurn*1.5f);
+		// process movement to update Location (not the same as Position -- Location is shared /w server!)
+		//XXX: stLocation *lPlayer = woMyself->GetLocation();
+		//XXX: stMoveInfo mPlayer = woMyself->GetMoveInfo();
+		//XXX: float fPlayerHeading = woMyself->GetHeading();
+		//XXX: lPlayer->Origin.x -= -sin(fPlayerHeading);
+		//XXX: lPlayer->Origin.y += -cos(fPlayerHeading);
+		m_World->Unlock();
+	}
+}
+
 
 void cInterface::SetInterfaceMode(eInterfaceMode Mode)
 {
@@ -1726,14 +1730,14 @@ bool cInterface::OnRender( IWindow & Window, double TimeSlice )
 		if (woMyself)
 		{
 			woMyself->Lock();
-			DWORD dwCurLB = woMyself->GetLandblock();
+			DWORD dwCurLB = woMyself->GetCellID();
 			woMyself->Unlock();
             // load landblocks within draw radius
             int numLandblocksLoaded = m_World->LoadLandblocks(dwCurLB, m_iRenderRadius);
             //OutputConsoleString("Loaded %d landblocks", numLandblocksLoaded);
 
             std::unordered_set<WORD>::iterator i = m_World->GetIterCurrentLandblocks();
-            cLandblock *pLB = m_World->GetNextLandblock(i);
+            Physics::Common::cLandblock *pLB = m_World->GetNextLandblock(i);
             while (pLB != NULL) {
                 m_iTriCount += pLB->Draw();
                 pLB = m_World->GetNextLandblock(i);

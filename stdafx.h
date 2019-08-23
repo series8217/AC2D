@@ -45,7 +45,7 @@ typedef unsigned __int64 QWORD;
 #include <list>
 #include <map>
 #include <string>
-#include "zlib\zlib.h"
+//#include "zlib\zlib.h"
 
 #include <assert.h>
 
@@ -57,8 +57,7 @@ typedef unsigned __int64 QWORD;
 #include <winsock2.h>
 #include <ws2tcpip.h>
 
-#define DETECT_AND_HALT_ON_HEAP_CORRUPTION(...)     {}
-//_ASSERTE( _CrtCheckMemory( ) );
+#define DETECT_AND_HALT_ON_HEAP_CORRUPTION(...)     _ASSERTE( _CrtCheckMemory( ) );
 
 
 #define NEW_INLINE_WORKAROUND new ( _NORMAL_BLOCK ,\
@@ -66,6 +65,7 @@ typedef unsigned __int64 QWORD;
 #define new NEW_INLINE_WORKAROUND
 
 #define MODEL_SCALE_FACTOR  (1.0f/240.0f)
+#define LANDBLOCK_SCALE (1.0f/10.0f)
 
 struct stTransitHeader	//20 bytes
 {
@@ -156,13 +156,21 @@ const BYTE cColor[][3] = {
 	{ 0x00, 0x00, 0xFF },		//11 - eBlue*/
 };
 
+struct Origin {
+    float x, y, z;
+};
+
+struct Orientation {
+    float w; // W
+    float a; // X
+    float b; // Y
+    float c; // Z
+};
+
 struct stLocation {	//32 bytes
-	DWORD landblock;
-	float xOffset, yOffset, zOffset;
-	float wHeading; // W
-	float aHeading; // X
-	float bHeading; // Y
-	float cHeading; // Z
+    DWORD cell_id;
+    Origin Origin;
+    Orientation Orientation;
 };
 
 struct stMoveInfo {	//8 bytes

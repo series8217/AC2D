@@ -5,9 +5,11 @@
 #include "cThread.h"
 #include "cModelGroup.h"
 
+class cWorld;
+
 class cWObject : public cLockable {
 public:
-	cWObject();
+	cWObject(cWorld* world);
 	~cWObject();
 
 	void ParseMessageObjectCreate(cMessage * Message);
@@ -29,7 +31,7 @@ public:
 	cPoint3D GetPosition();
 	stLocation * GetLocation();
 	stMoveInfo GetMoveInfo();
-	DWORD GetLandblock();
+	DWORD GetCellID();
 	float GetHeading();
 	std::string GetName();
 	DWORD GetWielder();
@@ -62,6 +64,8 @@ public:
 private:
 	void LoadAnimset();
 	void LoadLocationHeading(float fZ);
+
+    cWorld* m_World;
 
 	//calculated members
 	float m_fHeading;

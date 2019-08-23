@@ -57,6 +57,7 @@ cPortal::~cPortal()
 		delete m_tfPortalHighRes;
 }
 
+// dwID here is same as "FILE_ID" in ACE Server terminology
 cPortalFile * cPortal::OpenEntry( DWORD dwID )
 {
 	cPortalFile *tp = NULL;
@@ -252,9 +253,6 @@ DWORD cPortal::FindGraphic(DWORD ID, std::vector<stPaletteSwap> *vPaletteSwaps, 
 					{
 						case 0x14:
 						case 0xF3:				//RGB (24-bit color)
-                            // XXX: buffer overrun here... or reading outside of pfUI data
-                            // XXX: original is = *((DWORD *) (pfUI->data+24+(3*(sizeX*y+x)))) | 0xFF000000;
-                            // XXX: to avoid overrun set it to = texDataStart[3*(sizeX*y+x)] << 24;
                             *((DWORD *)&tex[4 * sizeX2*y + x * 4]) = *((DWORD *)(pfUI->data + 24 + (3 * (sizeX*y + x)))) | 0xFF000000;
 							break;
 						case 0x15:				//RGBA (32-bit color)

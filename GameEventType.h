@@ -1,5 +1,6 @@
 #pragma once
 
+//** Ported from ACE: https://github.com/ACEmulator/ACE
 namespace GameEvents {
 
     enum GameEventType

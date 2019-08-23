@@ -102,7 +102,7 @@
       <SDLCheck>true</SDLCheck>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>opengl32.lib;glu32.lib;ws2_32.lib;zlib\zlibstat.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>opengl32.lib;glu32.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutputPath)\$(TargetFileName)</OutputFile>
       <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
       <IgnoreSpecificDefaultLibraries>LIBC;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
@@ -131,7 +131,7 @@
       <SDLCheck>true</SDLCheck>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>opengl32.lib;glu32.lib;ws2_32.lib;zlib\zlibstat.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>opengl32.lib;glu32.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutputPath)\$(TargetFileName)</OutputFile>
       <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
       <IgnoreSpecificDefaultLibraries>LIBC;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
@@ -156,7 +156,7 @@
       <SDLCheck>true</SDLCheck>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>opengl32.lib;glu32.lib;ws2_32.lib;zlib\zlibstat.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>opengl32.lib;glu32.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>C:\turbine\ac\3\ac2dtest.exe</OutputFile>
       <IgnoreSpecificDefaultLibraries>LIBC;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -181,7 +181,7 @@
       <SDLCheck>true</SDLCheck>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>opengl32.lib;glu32.lib;ws2_32.lib;zlib\zlibstat.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>opengl32.lib;glu32.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutputPath)\$(TargetFileName)</OutputFile>
       <IgnoreSpecificDefaultLibraries>LIBC;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -253,6 +253,7 @@
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Disabled</Optimization>
     </ClCompile>
     <ClCompile Include="cPhysics.cpp" />
+    <ClCompile Include="cPoint3D.cpp" />
     <ClCompile Include="cPortal.cpp">
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Disabled</Optimization>
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Disabled</Optimization>
@@ -271,6 +272,7 @@
     </ClCompile>
     <ClCompile Include="cWorld.cpp" />
     <ClCompile Include="Landblocks.cpp" />
+    <ClCompile Include="LandDefs.cpp" />
     <ClCompile Include="stdafx.cpp">
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Disabled</Optimization>
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Disabled</Optimization>
@@ -279,6 +281,8 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="Vector2.cpp" />
+    <ClCompile Include="Vector3.cpp" />
     <ClCompile Include="WindowLib\CButton.cpp" />
     <ClCompile Include="WindowLib\CClipboard.cpp" />
     <ClCompile Include="WindowLib\CMessageBox.cpp" />
@@ -288,6 +292,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AC2DTest.h" />
+    <ClInclude Include="AFrame.h" />
     <ClInclude Include="BSPTypes.h" />
     <ClInclude Include="cByteStream.h" />
     <ClInclude Include="cCellManager.h" />
@@ -304,17 +309,27 @@
     <ClInclude Include="cPacket.h" />
     <ClInclude Include="cPhysics.h" />
     <ClInclude Include="cPoint3D.h" />
+    <ClInclude Include="LandDefs.h" />
+    <ClInclude Include="Polygon.h" />
     <ClInclude Include="cPortal.h" />
     <ClInclude Include="cThread.h" />
     <ClInclude Include="cTurbineFile.h" />
     <ClInclude Include="cWObject.h" />
     <ClInclude Include="cWorld.h" />
+    <ClInclude Include="Frame.h" />
     <ClInclude Include="GameEventType.h" />
     <ClInclude Include="GameMessageOpcode.h" />
     <ClInclude Include="Landblocks.h" />
+    <ClInclude Include="PhysicsGlobals.h" />
+    <ClInclude Include="Plane.h" />
+    <ClInclude Include="quaternion.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="Skill.h" />
     <ClInclude Include="stdafx.h" />
+    <ClInclude Include="tmatrix.h" />
+    <ClInclude Include="Vector2.h" />
+    <ClInclude Include="Vector3.h" />
+    <ClInclude Include="Vertex.h" />
     <ClInclude Include="WindowLib\CButton.h" />
     <ClInclude Include="WindowLib\CClipboard.h" />
     <ClInclude Include="WindowLib\EventAbstractors\ClipboardEventsAbstractor.h" />

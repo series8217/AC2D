@@ -1,6 +1,6 @@
 #pragma once
 
-//** From ACE: https://github.com/ACEmulator/ACE
+//** Ported from ACE: https://github.com/ACEmulator/ACE
 
 namespace Physics {
     namespace EncumbranceSystem {

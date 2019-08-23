@@ -327,19 +327,19 @@ bool cModelGroup::ReadModel(DWORD dwModel, std::vector<stPaletteSwap> *vPaletteS
 			for (DWORD h = 0; h < dwNumObjs; h++)
 			{
 				stLocation tpld;
-				tpld.xOffset = pBS.ReadFloat();
-				tpld.yOffset = pBS.ReadFloat();
-				tpld.zOffset = pBS.ReadFloat();
-				tpld.wHeading = pBS.ReadFloat();
-				tpld.aHeading = pBS.ReadFloat();
-				tpld.bHeading = pBS.ReadFloat();
-				tpld.cHeading = pBS.ReadFloat();
-//				tpld.landblock = 0;
+				tpld.Origin.x = pBS.ReadFloat();
+				tpld.Origin.y = pBS.ReadFloat();
+				tpld.Origin.z = pBS.ReadFloat();
+				tpld.Orientation.w = pBS.ReadFloat();
+				tpld.Orientation.a = pBS.ReadFloat();
+				tpld.Orientation.b = pBS.ReadFloat();
+				tpld.Orientation.c = pBS.ReadFloat();
+//				tpld.cell_id = 0;
 //				cPoint3D tp3d;
 //				tp3d.CalcFromLocation(&tpld);
 
-				m_vModels[h]->SetTranslation(cPoint3D(tpld.xOffset, tpld.yOffset, tpld.zOffset));
-				m_vModels[h]->SetRotation(tpld.wHeading, tpld.aHeading, tpld.bHeading, tpld.cHeading);
+				m_vModels[h]->SetTranslation(cPoint3D(tpld.Origin.x, tpld.Origin.y, tpld.Origin.z));
+				m_vModels[h]->SetRotation(tpld.Orientation.w, tpld.Orientation.a, tpld.Orientation.b, tpld.Orientation.c);
 			}
 /*			DWORD dwHookCount = pBS.ReadDWORD();
 			for (DWORD h = 0; h < dwHookCount; h++)

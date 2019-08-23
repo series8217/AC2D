@@ -2008,7 +2008,7 @@ void cNetwork::ProcessMessage(cMessage *Msg, stServerInfo *Server)
 	case GameMessages::ObjectCreate:
 	{
 		//create object
-		cWObject *tpObj = new cWObject();
+		cWObject *tpObj = new cWObject(m_World);
 		tpObj->ParseMessageObjectCreate(Msg);
 		m_World->AddObject(tpObj);
 
@@ -2047,7 +2047,6 @@ void cNetwork::ProcessMessage(cMessage *Msg, stServerInfo *Server)
 	{
 		DWORD object = Msg->ReadDWORD();
 		m_CharInfo->SetGUID(object);
-
 		break;
 	}
 	case GameMessages::ObjectDelete:

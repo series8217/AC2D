@@ -38,6 +38,7 @@ void cByteStream::ReadBegin( void )
 	m_pbDataPtr = m_pbDataStart;
 }
 
+// Align to next DWORD boundary?
 void cByteStream::ReadAlign( void )
 {
 	int iOffset = (int) (m_pbDataPtr - m_pbDataStart);

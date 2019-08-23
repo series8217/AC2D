@@ -1,22 +1,28 @@
 #include "stdafx.h"
 #include "cWObject.h"
+#include "cWorld.h"
+#include "Landblocks.h"
+#include "cInterface.h"
 
 #include <math.h>
 
-cWObject::cWObject()
+
+cWObject::cWObject(cWorld* world)
 {
+    m_World = world;
+
 	//init all values to zero...
 	GUID = 0;
 	wielder = 0;
 	m_wStance = 0x003D;
-	location.xOffset = 0;
-	location.yOffset = 0;
-	location.zOffset = 0;
-	location.wHeading = 0;
-	location.aHeading = 0;
-	location.bHeading = 0;
-	location.cHeading = 0;
-	location.landblock = 0;
+	location.Origin.x = 0;
+	location.Origin.y = 0;
+	location.Origin.z = 0;
+	location.Orientation.w = 0;
+	location.Orientation.a = 0;
+	location.Orientation.b = 0;
+	location.Orientation.c = 0;
+	location.cell_id = 0;
 	objectName = "";
 
 	animCount = 0;
@@ -86,26 +92,34 @@ void cWObject::UpdatePosition(float fTimeDiff)
         // position (3d model)
 		CalcPosition += tpstrafe*(fVelocityFB*fTimeDiff*MODEL_SCALE_FACTOR);
         // location (server space)
-        location.xOffset += -sin(fCurHeading)*fVelocityFB*fTimeDiff;
-        location.yOffset += cos(fCurHeading)*fVelocityFB*fTimeDiff;
+        location.Origin.x += -sin(fCurHeading)*fVelocityFB*fTimeDiff;
+        location.Origin.y += cos(fCurHeading)*fVelocityFB*fTimeDiff;
 
 		//Strafing
 		tpstrafe.RotateAround(cPoint3D(0,0,0), cPoint3D(0,0,(float) -M_PI/2));
         // position (3d model)
 		CalcPosition += tpstrafe*(fVelocityStrafe*fTimeDiff*MODEL_SCALE_FACTOR);
         // location (server space)
-        location.xOffset -= -sin(fCurHeading + 0.5*M_PI)*fVelocityStrafe*fTimeDiff;
-        location.yOffset += -cos(fCurHeading + 0.5*M_PI)*fVelocityStrafe*fTimeDiff;
+        location.Origin.x -= -sin(fCurHeading + 0.5*M_PI)*fVelocityStrafe*fTimeDiff;
+        location.Origin.y += -cos(fCurHeading + 0.5*M_PI)*fVelocityStrafe*fTimeDiff;
 
-        // TODO: correct the Z position to follow the ground
+        // correct the Z position to maintain contact with the ground plane
         // get the current landblock
-        
+        Lock();
+        Physics::Common::cLandblock* landblock = m_World->GetLandblock(this->GetCellID());
+		assert(landblock);
+		// set the z position to the landblock terrain height
+		float new_z = landblock->GetZ(location.Origin);
+		location.Origin.z = new_z;
+		CalcPosition.z = new_z* MODEL_SCALE_FACTOR;
+		// TODO: inside buildings, below ground, jumping, etc.
+        Unlock();
 
         //XXX: stLocation *lPlayer = woMyself->GetLocation();
         //XXX: stMoveInfo mPlayer = woMyself->GetMoveInfo();
         //XXX: float fPlayerHeading = woMyself->GetHeading();
-        //XXX: lPlayer->xOffset -= -sin(fPlayerHeading);
-        //XXX: lPlayer->yOffset += -cos(fPlayerHeading);
+        //XXX: lPlayer->Origin.x -= -sin(fPlayerHeading);
+        //XXX: lPlayer->Origin.y += -cos(fPlayerHeading);
 
 		CalcHeading();
 	}
@@ -132,7 +146,7 @@ void cWObject::UpdatePosition(float fTimeDiff)
 		m_bModelUpdate = false;
 	}
 	m_mgModel->SetTranslation(CalcPosition);
-	m_mgModel->SetRotation(location.wHeading, location.aHeading, location.bHeading, location.cHeading);
+	m_mgModel->SetRotation(location.Orientation.w, location.Orientation.a, location.Orientation.b, location.Orientation.c);
 	m_mgModel->UpdateAnim(fTimeDiff);
 	Unlock();
 }
@@ -673,14 +687,14 @@ void cWObject::ParseMessageUpdatePosition(cMessage * Message)
 
 	DWORD flags = Message->ReadDWORD();
 
-	location.landblock = Message->ReadDWORD();
-	location.xOffset = Message->ReadFloat();
-	location.yOffset = Message->ReadFloat();
-	location.zOffset = Message->ReadFloat();
-	if (~flags & 0x08) location.wHeading = Message->ReadFloat();
-	if (~flags & 0x10) location.aHeading = Message->ReadFloat();// else location.aHeading = 0;
-	if (~flags & 0x20) location.bHeading = Message->ReadFloat();// else location.bHeading = 0;
-	if (~flags & 0x40) location.cHeading = Message->ReadFloat();
+	location.cell_id = Message->ReadDWORD();
+	location.Origin.x = Message->ReadFloat();
+	location.Origin.y = Message->ReadFloat();
+	location.Origin.z = Message->ReadFloat();
+	if (~flags & 0x08) location.Orientation.w = Message->ReadFloat();
+	if (~flags & 0x10) location.Orientation.a = Message->ReadFloat();// else location.Orientation.a = 0;
+	if (~flags & 0x20) location.Orientation.b = Message->ReadFloat();// else location.Orientation.b = 0;
+	if (~flags & 0x40) location.Orientation.c = Message->ReadFloat();
 	if (flags & 0x01)
 	{
 		//velocity
@@ -805,15 +819,15 @@ void cWObject::CalcHeading()
 	double cz,sz;
 
 	// CONVERT QUATERNION TO MATRIX - I DON'T REALLY NEED ALL OF IT
-	matrix[0][0] = 1.0f - (2.0f * location.bHeading * location.bHeading) - (2.0f * location.cHeading * location.cHeading);
-//	matrix[0][1] = (2.0f * location.aHeading * location.bHeading) - (2.0f * location.wHeading * location.cHeading);
-//	matrix[0][2] = (2.0f * location.aHeading * location.cHeading) + (2.0f * location.wHeading * location.bHeading);
-	matrix[1][0] = (2.0f * location.aHeading * location.bHeading) + (2.0f * location.wHeading * location.cHeading);
-//	matrix[1][1] = 1.0f - (2.0f * location.aHeading * location.aHeading) - (2.0f * location.cHeading * location.cHeading);
-//	matrix[1][2] = (2.0f * location.bHeading * location.cHeading) - (2.0f * location.wHeading * location.aHeading);
-	matrix[2][0] = (2.0f * location.aHeading * location.cHeading) - (2.0f * location.wHeading * location.bHeading);
-//	matrix[2][1] = (2.0f * location.bHeading * location.cHeading) + (2.0f * location.wHeading * location.aHeading);
-//	matrix[2][2] = 1.0f - (2.0f * location.aHeading * location.aHeading) - (2.0f * location.bHeading * location.bHeading);
+	matrix[0][0] = 1.0f - (2.0f * location.Orientation.b * location.Orientation.b) - (2.0f * location.Orientation.c * location.Orientation.c);
+//	matrix[0][1] = (2.0f * location.Orientation.a * location.Orientation.b) - (2.0f * location.Orientation.w * location.Orientation.c);
+//	matrix[0][2] = (2.0f * location.Orientation.a * location.Orientation.c) + (2.0f * location.Orientation.w * location.Orientation.b);
+	matrix[1][0] = (2.0f * location.Orientation.a * location.Orientation.b) + (2.0f * location.Orientation.w * location.Orientation.c);
+//	matrix[1][1] = 1.0f - (2.0f * location.Orientation.a * location.Orientation.a) - (2.0f * location.Orientation.c * location.Orientation.c);
+//	matrix[1][2] = (2.0f * location.Orientation.b * location.Orientation.c) - (2.0f * location.Orientation.w * location.Orientation.a);
+	matrix[2][0] = (2.0f * location.Orientation.a * location.Orientation.c) - (2.0f * location.Orientation.w * location.Orientation.b);
+//	matrix[2][1] = (2.0f * location.Orientation.b * location.Orientation.c) + (2.0f * location.Orientation.w * location.Orientation.a);
+//	matrix[2][2] = 1.0f - (2.0f * location.Orientation.a * location.Orientation.a) - (2.0f * location.Orientation.b * location.Orientation.b);
 
 	sy = -matrix[2][0];
 
@@ -842,10 +856,10 @@ void cWObject::LoadLocationHeading(float fZ)
 //	x = s1 s2 c3 +c1 c2 s3
 //	y = s1 c2 c3 + c1 s2 s3
 //	z = c1 s2 c3 - s1 c2 s3
-	location.wHeading = c2;
-	location.aHeading = 0;
-	location.bHeading = 0;
-	location.cHeading = s2;
+	location.Orientation.w = c2;
+	location.Orientation.a = 0;
+	location.Orientation.b = 0;
+	location.Orientation.c = s2;
 }
 
 std::string cWObject::GetName()
@@ -853,9 +867,10 @@ std::string cWObject::GetName()
 	return objectName;
 }
 
-DWORD cWObject::GetLandblock()
+// get the landblock / cell ID
+DWORD cWObject::GetCellID()
 {
-	return location.landblock;
+	return location.cell_id;
 }
 
 stLocation * cWObject::GetLocation()

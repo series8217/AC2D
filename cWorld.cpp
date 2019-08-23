@@ -1,6 +1,11 @@
 #include "stdafx.h"
 #include "cWorld.h"
 #include "cThread.h"
+#include "LandDefs.h"
+#include "Vector2.h"
+
+
+using namespace Physics::Common;
 
 
 cWorld::cWorld()
@@ -8,6 +13,8 @@ cWorld::cWorld()
     m_mLandblocks.clear();
     m_mCurrentLandblocks.clear();
     m_mNeedToLoadBlocks.clear();
+
+    LandDefs::InitFromPortalDat();
 }
 
 cWorld::~cWorld()
@@ -23,7 +30,7 @@ int cWorld::LoadNeededLandblocks()
 
     for (std::unordered_set<WORD>::iterator i = m_mNeedToLoadBlocks.begin(); i != m_mNeedToLoadBlocks.end(); i++)
     {
-        cLandblock *pLB = new cLandblock();
+        cLandblock *pLB = new cLandblock(this);
         pLB->Load(*i);
         m_mLandblocks[*i] = pLB;
         numLandblocks++;
@@ -84,6 +91,21 @@ int cWorld::LoadLandblocks(DWORD dwCurrentLandblock, int renderRadius) {
 
 }
 
+cLandblock* cWorld::GetLandblock(DWORD cellID) {
+    std::map<WORD, cLandblock*>::iterator i;
+    cLandblock *pLB = NULL;
+
+	// landblock ID is the 4 MSBs
+	WORD landblockID = cellID >> 16;
+    i = m_mLandblocks.find(landblockID);
+    if (i == m_mLandblocks.end()) {
+        return NULL;
+    }
+
+    pLB = i->second;
+    return pLB;
+}
+
 void cWorld::AddLandblock(cPortalFile *NewLB)
 {
     Lock();
@@ -92,3 +114,51 @@ void cWorld::AddLandblock(cPortalFile *NewLB)
     Unlock();
 }
 
+// same as get_landcell in ACE
+LandblockCell* cWorld::GetLandblockCell(DWORD block_cell_id) {
+	//Console.WriteLine($"get_landcell({blockCellID:X8}");
+
+	cLandblock* landblock = GetLandblock(block_cell_id);
+	if (landblock == NULL)
+		return NULL;
+
+	DWORD cellID = block_cell_id & 0xFFFF;
+	LandblockCell* cell = NULL;
+
+	// outdoor cells
+	if (cellID < 0x100)
+	{
+		Vector2* lcoord = LandDefs::gid_to_lcoord(block_cell_id, false);
+		if (lcoord == NULL) return NULL;
+		unsigned int landCellIdx = ((int)lcoord->y % 8) + ((int)lcoord->x % 8) * landblock->SideCellCount;
+		delete lcoord;
+		// XXX: TODO: lock the landblock? needs to be concurrency-safe map
+		auto it = landblock->m_landcells.find(landCellIdx);
+		if (it != landblock->m_landcells.end()) {
+			cell = &it->second;
+		}
+	}
+	// indoor cells
+	else
+	{
+		auto it = landblock->m_landcells.find((int)cellID);
+		if (it != landblock->m_landcells.end()) {
+			cell = &it->second;
+		}
+
+		// XXX: TODO: implement me
+		//else {
+		//	lock(landblock.LandCellMutex)
+		//	{
+		//		if (landblock.LandCells.TryGetValue((int)cellID, out cell))
+		//			return cell;
+
+		//		cell = DBObj.GetEnvCell(blockCellID);
+		//		landblock.LandCells.TryAdd((int)cellID, cell);
+		//		var envCell = (EnvCell)cell;
+		//		envCell.PostInit();
+		//	}
+		//}
+	}
+	return cell;
+}

@@ -19,6 +19,9 @@
     <Filter Include="Window Controls">
       <UniqueIdentifier>{2368aa91-23fb-4be2-9565-77a7c37b28f7}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Physics">
+      <UniqueIdentifier>{4c1ca26f-0504-4ed1-bbc5-47185d82c66d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AC2DTest.cpp">
@@ -106,7 +109,19 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="cPhysics.cpp">
+      <Filter>Physics</Filter>
+    </ClCompile>
+    <ClCompile Include="cPoint3D.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Vector3.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Vector2.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="LandDefs.cpp">
+      <Filter>Physics</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -281,10 +296,43 @@
     <ClInclude Include="GameEventType.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="cPhysics.h">
+    <ClInclude Include="Skill.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Skill.h">
+    <ClInclude Include="cPhysics.h">
+      <Filter>Physics</Filter>
+    </ClInclude>
+    <ClInclude Include="PhysicsGlobals.h">
+      <Filter>Physics</Filter>
+    </ClInclude>
+    <ClInclude Include="quaternion.h">
+      <Filter>Physics</Filter>
+    </ClInclude>
+    <ClInclude Include="tmatrix.h">
+      <Filter>Physics</Filter>
+    </ClInclude>
+    <ClInclude Include="AFrame.h">
+      <Filter>Physics</Filter>
+    </ClInclude>
+    <ClInclude Include="Frame.h">
+      <Filter>Physics</Filter>
+    </ClInclude>
+    <ClInclude Include="Plane.h">
+      <Filter>Physics</Filter>
+    </ClInclude>
+    <ClInclude Include="Vector3.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Polygon.h">
+      <Filter>Physics</Filter>
+    </ClInclude>
+    <ClInclude Include="Vertex.h">
+      <Filter>Physics</Filter>
+    </ClInclude>
+    <ClInclude Include="LandDefs.h">
+      <Filter>Physics</Filter>
+    </ClInclude>
+    <ClInclude Include="Vector2.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

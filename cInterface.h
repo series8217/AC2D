@@ -54,6 +54,8 @@ public:
 	int Draw(RECT rRect, HDC hDC);
 	void Resize(int iWidth, int iHeight);
 
+	void UpdatePlayerMoveState();
+
 	void OutputConsoleString(std::string & Output);
 	void OutputConsoleString(char *format, ...);
 	void OutputString(eColor Color, std::string & Output);
@@ -116,6 +118,7 @@ private:
 	float m_fConnProgress;
 	stCharList m_CharList;
 	char m_MOTD[2048];
+	// ID for the player character object
 	DWORD m_dwSelChar;
 	DWORD m_dwNumPlayers;
 	char m_sWorldName[128];

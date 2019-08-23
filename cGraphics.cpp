@@ -155,6 +155,7 @@ void cGraphics::Run()
 
 		glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 
+		// this is the main rendering function
 		int tricount = m_Interface->Draw(m_rRect, m_hDC);
 		
 		SwapBuffers( m_hDC );
@@ -178,7 +179,10 @@ void cGraphics::Run()
 #define WINDOW_TITLE_STRING_BUFFER_SIZE 256
 
 		char pbTemp[WINDOW_TITLE_STRING_BUFFER_SIZE];
-		_snprintf_s(pbTemp, WINDOW_TITLE_STRING_BUFFER_SIZE, "AC2D - %04i FPS - %i Tris - Cell: %i, Portal: %i - %0.1f Speed - %04X Landblock", iFPS, tricount, m_Cell->GetPoolSize(), m_Portal->GetPoolSize(), m_Interface->GetZoomSpeed(), m_Interface->GetPosition());
+		_snprintf_s(pbTemp, WINDOW_TITLE_STRING_BUFFER_SIZE,
+			"AC2D - %04i FPS - %i Tris - Cell: %i, Portal: %i - %0.1f Speed - %04X Landblock",
+			iFPS, tricount, m_Cell->GetPoolSize(), m_Portal->GetPoolSize(),
+			m_Interface->GetZoomSpeed(), m_Interface->GetPosition());
 		SetWindowText(m_hWnd,pbTemp);
 
 		//sleep so other windows can have some cpu
