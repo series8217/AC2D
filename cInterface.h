@@ -125,7 +125,6 @@ private:
 
 	DWORD m_dwLastAttacker;
 	bool m_bCombatMode;
-//	WORD m_wStance;
 	DWORD m_dwCurSelect;
 
 	bool m_bFirstSize;

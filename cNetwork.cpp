@@ -2721,7 +2721,7 @@ void cNetwork::SendMoveUpdate(int iFB, int iStrafe, int iTurn, bool bRunning)
 
 	stLocation *lTemp = woMyself->GetLocation();
 	stMoveInfo mTemp = woMyself->GetMoveInfo();
-	WORD wMyStance = woMyself->GetStance();
+	WORD wMyStance = static_cast<WORD>(woMyself->GetStance());
 	DWORD heldKey = 0;
 	if (bRunning) {
 		heldKey = 0x2;

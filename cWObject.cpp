@@ -14,7 +14,7 @@ cWObject::cWObject(cWorld* world)
 	//init all values to zero...
 	GUID = 0;
 	wielder = 0;
-	m_wStance = 0x003D;
+	m_Stance = Animation::Stance::NonCombat;
 	location.Origin.x = 0;
 	location.Origin.y = 0;
 	location.Origin.z = 0;
@@ -151,21 +151,66 @@ void cWObject::UpdatePosition(float fTimeDiff)
 	Unlock();
 }
 
-void cWObject::PlayAnimation(WORD wAnim, WORD wStance, float fPlaySpeed, bool bSetDefault)
+
+void cWObject::ClearDefaultAnimations() {
+	m_mgModel->ClearDefaultAnimations();
+}
+
+// Play animation using stance and ID
+void cWObject::PlayAnimation(Animation::MotionCommand Motion, Animation::Stance Stance, float fSpeedScale, bool sticky)
 {
 	//fix this to cache...
 	if (!m_mgModel)
 		return;
 
+	WORD wStance = static_cast<WORD>(Stance);
+	WORD wAnim = static_cast<WORD>(Motion);
+
 	if (m_mAnims.find(((DWORD) wStance << 16) | wAnim) != m_mAnims.end())
 	{
 		stAnimSet *asTemp = &m_mAnims[((DWORD) wStance << 16) | wAnim];
-		stAnimInfo aiTemp = asTemp->vAnims[0];
-
-		if (bSetDefault)
-			m_mgModel->SetDefaultAnim(aiTemp.dwAnim);
-		m_mgModel->PlayAnimation(aiTemp.dwAnim, aiTemp.dwStartFrame, aiTemp.dwEndFrame, aiTemp.fPlaySpeed * fPlaySpeed);
+		m_mgModel->PlayAnimation(asTemp, fSpeedScale, sticky);
 	}
+}
+
+// Set default animation using stance and ID
+void cWObject::SetDefaultAnimation(Animation::MotionCommand Motion, Animation::Stance Stance, float fSpeedScale)
+{
+	//fix this to cache...
+	if (!m_mgModel)
+		return;
+
+	WORD wStance = static_cast<WORD>(Stance);
+	WORD wAnim = static_cast<WORD>(Motion);
+
+	if (m_mAnims.find(((DWORD)wStance << 16) | wAnim) != m_mAnims.end())
+	{
+		stAnimSet *asTemp = &m_mAnims[((DWORD)wStance << 16) | wAnim];
+		m_mgModel->SetDefaultAnim(asTemp, fSpeedScale);
+	}
+}
+
+// Play animation directly by ID in portal dat file
+void cWObject::PlayAnimation(DWORD dwAnimID, float fPlaySpeed, bool bSetDefault)
+{
+	//fix this to cache...
+	if (!m_mgModel)
+		return;
+
+	if (bSetDefault) {
+		m_mgModel->SetDefaultAnim(dwAnimID, fPlaySpeed);
+	}
+	m_mgModel->PlayAnimation(dwAnimID, 0, 0xFFFFFFFF, fPlaySpeed);
+}
+
+// Set default animation directly by ID in portal dat file
+void cWObject::SetDefaultAnimation(DWORD dwAnimID, float fDefaultPlaySpeed)
+{
+	//fix this to cache...
+	if (!m_mgModel)
+		return;
+
+	m_mgModel->SetDefaultAnim(dwAnimID, fDefaultPlaySpeed);
 }
 
 void cWObject::ParseMessageMotion(cMessage * Message)
@@ -173,45 +218,49 @@ void cWObject::ParseMessageMotion(cMessage * Message)
     /* 0xF74C event */
 	Lock();
 	numLogins = Message->ReadWORD();
+	// movement sequence value for this object
 	WORD sequence = Message->ReadWORD();
+	// server control sequence value for the object
 	animCount = Message->ReadWORD();
-	WORD activity = Message->ReadWORD();
+	// 0x0 - server controlled, 0x1 - autonomous
+	WORD autonomous = Message->ReadWORD();
 
-	BYTE animation_type = Message->ReadByte();
-	BYTE type_flags = Message->ReadByte();
-	WORD wStance = Message->ReadWORD();
-//	if (m_wStance != wStance)
-//		f74csequence++;
-	m_wStance = wStance;
+	BYTE movementType = Message->ReadByte();
+	// options (sticky, standing long jump)
+	BYTE optionFlags = Message->ReadByte();
+	// current stance
+	m_Stance = Animation::StanceFromID(Message->ReadWORD());
 
-	switch (animation_type)
+	switch (movementType)
 	{
-	case 0x00:
+	case MovementType::InterpretedMotionState:
 		{
 			//general animation
 			DWORD flags = Message->ReadDWORD();
 
-			WORD wAnimToPlay = 3;
+			Animation::MotionCommand Motion = Animation::MotionCommand::Ready;
 			bool bSetDefault = true;
 			float fSpeed = 1.0f;
 			m_bMoving = false;
 
 			if (flags & 0x1)
 			{
+				// stance mode
 				WORD stance2 = Message->ReadWORD();
-				if (m_wStance != stance2)
+				if (m_Stance != Animation::StanceFromID(stance2))
 					int a = 4;
 			}
 			if (flags & 0x2)
 			{
+				// movement command
 				//hold animation until stopped
 				//holding out hand does this
-				wAnimToPlay = Message->ReadWORD();
+				Motion = Animation::MotionFromID(Message->ReadWORD());
 			}
 			if (flags & 0x8)
 			{
-				//strafing
-				wAnimToPlay = Message->ReadWORD();
+				// sidestep command
+				Motion = Animation::MotionFromID(Message->ReadWORD());
 				m_bMoving = true;
 			}
 			else
@@ -219,8 +268,8 @@ void cWObject::ParseMessageMotion(cMessage * Message)
 
 			if (flags & 0x20)
 			{
-				//turning...
-				wAnimToPlay = Message->ReadWORD();
+				// turn command
+				Motion = Animation::MotionFromID(Message->ReadWORD());
 				m_bMoving = true;
 			}
 			else
@@ -228,7 +277,7 @@ void cWObject::ParseMessageMotion(cMessage * Message)
 
 			if (flags & 0x4)
 			{
-				//movement speed (forward/backwards)
+				// movement speed (forward/backwards)
                 fVelocityFB = Message->ReadFloat();
 				fSpeed = fabs(fVelocityFB);
                 // XXX: where does this scaling factor come from?
@@ -240,22 +289,22 @@ void cWObject::ParseMessageMotion(cMessage * Message)
 
 			if (flags & 0x10)
 			{
-				//strafe speed
+				// sidestep speed
 				fVelocityStrafe = Message->ReadFloat();
 				fSpeed = fabs(fVelocityStrafe);
 				m_bMoving = true;
 			}
 			if (flags & 0x40)
 			{
-				//turn speed
+				// turn speed
 				fVelocityTurn = Message->ReadFloat();
 				fSpeed = fabs(fVelocityTurn);
 				m_bMoving = true;
 			}
 			if (flags & 0x80)
 			{
-				//anim sequence
-				wAnimToPlay = Message->ReadWORD();
+				//anim sequence?
+				Motion = Animation::MotionFromID(Message->ReadWORD());
 				WORD animSequence = Message->ReadWORD();
 				fSpeed = Message->ReadFloat();
 				bSetDefault = false;
@@ -269,23 +318,36 @@ void cWObject::ParseMessageMotion(cMessage * Message)
 //				fVelocityFB = 0;
 			}
 
-			PlayAnimation(wAnimToPlay, m_wStance, fSpeed, bSetDefault);
+			PlayAnimation(Motion, m_Stance, fSpeed, bSetDefault);
 
 			break;
 		}
-	case 0x06:
+	case MovementType::MoveToObject:
 		{
-			//move to object
-			DWORD object = Message->ReadDWORD();
-
-			stLocation tpLoc;
-			memcpy(&tpLoc, Message->ReadGroup(sizeof(tpLoc)), sizeof(tpLoc));
+			// ID and location of target being moved to
+			DWORD MoveToObjectID = Message->ReadDWORD();
+			DWORD MoveToCellID = Message->ReadDWORD();
+			Origin MoveToOrigin;
+			memcpy(&MoveToOrigin, Message->ReadGroup(sizeof(Origin)), sizeof(Origin));
+			stLocation targetLocation;
+			targetLocation.cell_id = MoveToCellID;
+			targetLocation.Origin = MoveToOrigin;
+			// Move to movement parameters
+			unsigned int bitmember = Message->ReadWORD();
+			// distance to given location
+			float distanceToObject = Message->ReadFloat();
+			// min distance required for the movement
+			float minDistance = Message->ReadFloat();
+			// distance at which movement will fail
+			float failDistance = Message->ReadFloat();
+			// speed of animation
 			float animation_speed = Message->ReadFloat();
-			float float_4 = Message->ReadFloat();
-			float heading = Message->ReadFloat();
-			DWORD unknown_value = Message->ReadDWORD();
+			// distance from the location that determines if player walks or runs to it
+			float walkRunThreshold = Message->ReadFloat();
+			// heading the object is turning to
+			float desiredHeading = Message->ReadFloat();
 			cPoint3D GoTo;
-			GoTo.CalcFromLocation(&tpLoc);
+			GoTo.CalcFromLocation(&targetLocation);
 			Velocity = (GoTo - CalcPosition);
 			Velocity.Normalize();
 			Velocity *= animation_speed*MODEL_SCALE_FACTOR;
@@ -293,31 +355,65 @@ void cWObject::ParseMessageMotion(cMessage * Message)
 
 			break;
 		}
-	case 0x07:
+	case MovementType::MoveToPosition:
 		{
-			stLocation tpLoc;
-			memcpy(&tpLoc, Message->ReadGroup(sizeof(tpLoc)), sizeof(tpLoc));
+			// location in the world to move to
+			DWORD MoveToCellID = Message->ReadDWORD();
+			Origin MoveToOrigin;
+			memcpy(&MoveToOrigin, Message->ReadGroup(sizeof(Origin)), sizeof(Origin));
+			stLocation targetLocation;
+			targetLocation.cell_id = MoveToCellID;
+			targetLocation.Origin = MoveToOrigin;
+			// Move to movement parameters
+			unsigned int bitmember = Message->ReadWORD();
+			// distance to given location
+			float distanceToObject = Message->ReadFloat();
+			// min distance required for the movement
+			float minDistance = Message->ReadFloat();
+			// distance at which movement will fail
+			float failDistance = Message->ReadFloat();
+			// speed of animation
 			float animation_speed = Message->ReadFloat();
-			float float_4 = Message->ReadFloat();
-			float heading = Message->ReadFloat();
-			DWORD unknown_value = Message->ReadDWORD();
+			// distance from the location that determines if player walks or runs to it
+			float walkRunThreshold = Message->ReadFloat();
+			// heading the object is turning to
+			float desiredHeading = Message->ReadFloat();
 			cPoint3D GoTo;
-			GoTo.CalcFromLocation(&tpLoc);
+			GoTo.CalcFromLocation(&targetLocation);
 			Velocity = (GoTo - CalcPosition);
 			Velocity.Normalize();
-			Velocity *= animation_speed* MODEL_SCALE_FACTOR;
+			Velocity *= animation_speed*MODEL_SCALE_FACTOR;
 			m_bMoving = true;
 
 			break;
 		}
-	case 0x08:
+	case MovementType::TurnToObject:
 		{
-			int a = 4;
+			// ID of target being faced
+			DWORD TurnToObjectID = Message->ReadDWORD();
+			// heading of the target to turn to (used instead of desired heading below)
+			float desiredHeading = Message->ReadFloat();
+			// Move to movement parameters
+			unsigned int bitmember = Message->ReadWORD();
+			// speed of animation
+			float animation_speed = Message->ReadFloat();
+			// heading the object is turning to. not used.
+			float desiredHeadingUnused = Message->ReadFloat();
+
+			// TODO: XXX: set up turn movement
+
 			break;
 		}
-	case 0x09:
+	case MovementType::TurnToPosition:
 		{
-			int a = 4;
+			// Move to movement parameters
+			unsigned int bitmember = Message->ReadWORD();
+			// speed of animation
+			float animation_speed = Message->ReadFloat();
+			// heading to turn to
+			float desiredHeading = Message->ReadFloat();
+
+			// TODO: XXX: set up turn movement
 			break;
 		}
 	default:
@@ -1030,7 +1126,7 @@ void cWObject::LoadAnimset()
     }
 }
 
-WORD cWObject::GetStance()
+Animation::Stance cWObject::GetStance()
 {
-	return m_wStance;
+	return m_Stance;
 }

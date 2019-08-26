@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "cModelGroup.h"
 #include "cByteStream.h"
+#include "AnimationIds.h"
 
 #include "BSPTypes.h"
 
@@ -13,9 +14,14 @@ cModelGroup::cModelGroup()
 	m_fAnimT;
 	m_pfAnim = 0;
 	m_fKeyData = NULL;
+	m_AnimSet = NULL;
+	m_DefaultAnimSet = NULL;
+	m_fDefaultAnimSetSpeedScale = 1.0;
+	m_AnimSetCurIndex = -1;
 	m_dwDefaultAnim = 0;
 	m_dwCurAnim = 0;
 	m_dwEndFrame = 0;
+	m_fDefaultPlaySpeed = 30.0;
 }
 
 cModelGroup::~cModelGroup()
@@ -26,8 +32,44 @@ cModelGroup::~cModelGroup()
 	delete []m_fKeyData;
 }
 
+void cModelGroup::ClearDefaultAnimations() {
+	m_dwDefaultAnim = 0;
+	m_DefaultAnimSet = NULL;
+}
+
+void cModelGroup::SetDefaultAnim(DWORD dwAnim, float fDefaultPlaySpeed)
+{
+	m_dwDefaultAnim = dwAnim;
+	//if (!m_dwCurAnim)
+	//	m_dwCurAnim = m_dwDefaultAnim;
+	m_fDefaultPlaySpeed = fDefaultPlaySpeed;
+}
+
+void cModelGroup::SetDefaultAnim(stAnimSet* AnimSet, float fSpeedScale)
+{
+	m_DefaultAnimSet = AnimSet;
+	m_fDefaultAnimSetSpeedScale = fSpeedScale;
+	//if (!m_dwCurAnim)
+	//	m_dwCurAnim = m_dwDefaultAnim;
+	
+}
+
+void cModelGroup::PlayAnimation(stAnimSet* AnimSet, float PlaySpeed, bool sticky)
+{
+	m_AnimSet = AnimSet;
+	m_AnimSetCurIndex = 0;
+	m_fAnimSetSpeedScale = PlaySpeed;
+	m_bAnimSetSticky = sticky;
+	PlayAnimation(&m_AnimSet->vAnims[m_AnimSetCurIndex], PlaySpeed);
+}
+
+void cModelGroup::PlayAnimation(stAnimInfo* AnimInfo, float SpeedScale){
+	PlayAnimation(AnimInfo->dwAnim, AnimInfo->dwStartFrame, AnimInfo->dwEndFrame, AnimInfo->fPlaySpeed * SpeedScale);
+}
+
 void cModelGroup::PlayAnimation(DWORD dwAnim, DWORD dwStartFrame, DWORD dwEndFrame, float fPlaySpeed)
 {
+	// XXX: TODO: get negative play speed working properly.
 	m_fAnimT = dwStartFrame/fPlaySpeed;
 	m_fPlaySpeed = fPlaySpeed;
 	m_dwEndFrame = dwEndFrame;
@@ -37,7 +79,7 @@ void cModelGroup::PlayAnimation(DWORD dwAnim, DWORD dwStartFrame, DWORD dwEndFra
 	m_fKeyData = NULL;
 
 	//now, load animation data
-	m_pfAnim = m_Portal->OpenEntry(dwAnim);
+	m_pfAnim = m_Portal->OpenEntry(Animation::BaseID | dwAnim);
 	if (!m_pfAnim)
 		return;
 
@@ -105,20 +147,57 @@ void cModelGroup::PlayAnimation(DWORD dwAnim, DWORD dwStartFrame, DWORD dwEndFra
 
 void cModelGroup::UpdateAnim(float fTime)
 {
-	if (!m_dwCurAnim)
-		return;
+	if (!m_dwCurAnim) {
+		if (m_dwDefaultAnim) {
+			PlayAnimation(m_dwDefaultAnim, 0, 0xFFFFFFFF, m_fDefaultPlaySpeed);
+		}
+		else {
+			return;
+		}
+	}
 
 	m_fAnimT += fTime;
 	DWORD iFrameNum = (int)(m_fPlaySpeed*m_fAnimT);
 
 	if ((!m_fKeyData) || ((iFrameNum >= m_dwEndFrame) && (m_dwCurAnim != m_dwDefaultAnim)))
 	{
-//		delete []m_fKeyData;
-//		return;
+		// currently in an animation set
+		if (m_AnimSet) {
+			m_AnimSetCurIndex++;
+			if (m_AnimSetCurIndex < m_AnimSet->vAnims.size()){
+				// play next animation
+				PlayAnimation(&m_AnimSet->vAnims[m_AnimSetCurIndex], m_fAnimSetSpeedScale);
+				iFrameNum = 0;
+			} else {
+				if (m_bAnimSetSticky){
+					// repeat last animation
+					m_AnimSetCurIndex = m_AnimSet->vAnims.size() - 1;
+	 				PlayAnimation(&m_AnimSet->vAnims[m_AnimSetCurIndex], m_fAnimSetSpeedScale);
+					//iFrameNum = 0;
+				} else {
+					// done with set
+					m_AnimSet = NULL;
+					m_AnimSetCurIndex = -1;
+					m_fAnimSetSpeedScale = 1.0;
+				}
+			}
 
-		//revert to default anim
-		PlayAnimation(m_dwDefaultAnim, 0, 0xFFFFFFFF, 30.0f);
-		iFrameNum = 0;
+		}
+		if (!m_AnimSet){
+			if (m_DefaultAnimSet) {
+				// FIXME: this may get called excessively since m_dwCurAnim != m_dwDefaultAnim when playing default set.
+				PlayAnimation(m_DefaultAnimSet, m_fDefaultAnimSetSpeedScale);
+				// FIXME: if only one animation in set, this will cause stuttering when playing back at high speed...
+				// XXX: this also probably breaks negative play speed animations
+				iFrameNum = 0;
+			}
+			else {
+				//revert to default anim
+				PlayAnimation(m_dwDefaultAnim, 0, 0xFFFFFFFF, m_fDefaultPlaySpeed);
+				// XXX: this might break negative play speed animations
+				iFrameNum = 0;
+			}
+		}
 
 		//in case it fucks up
 		if (!m_fKeyData)
@@ -351,11 +430,4 @@ bool cModelGroup::ReadModel(DWORD dwModel, std::vector<stPaletteSwap> *vPaletteS
 	}
 
 	return true;
-}
-
-void cModelGroup::SetDefaultAnim(DWORD dwAnim)
-{
-	m_dwDefaultAnim = dwAnim;
-	if (!m_dwCurAnim)
-		m_dwCurAnim = m_dwDefaultAnim;
 }

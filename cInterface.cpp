@@ -2,9 +2,11 @@
 #include "cInterface.h"
 #include "cPhysics.h"
 #include "Skill.h"
+#include "AnimationIds.h"
 
-DWORD dwAnim = 0x030000AC;//0x03000000 | 2128;
+DWORD dwAnim = static_cast<DWORD>(Animation::ID::HumanWaveArm);
 DWORD dwTexBase = 0x06000000;
+
 cInterface::cInterface()
 {
 //	cWObject *WO = new cWObject();
@@ -53,7 +55,6 @@ cInterface::cInterface()
 
 	m_bShowConsole = false;
 
-//	m_wStance = 0x3D;
 	m_bCombatMode = false;
 
 	QueryPerformanceFrequency(&liFreq);
@@ -472,7 +473,22 @@ int cInterface::Draw(RECT rRect, HDC hDC)
 void cInterface::UpdatePlayerMoveState() {
 	//Update velocity info
 	cWObject *woMyself = m_World->FindObject(m_dwSelChar);
-	if (woMyself) {
+	//if (woMyself && m_MotionControlsState.forward) {
+	//	static auto it = woMyself->m_mAnims.begin();
+	//	while (it != woMyself->m_mAnims.end())
+	//	{
+	//		// Accessing KEY from element pointed by it.
+	//		cWObject::stAnimSet* animSet= &it->second;
+	//
+	//		OutputConsoleString("Stance=%04x, Index=%04x, AnimID[0]=%08x...", animSet->wStance, animSet->wID, animSet->vAnims[0].dwAnim);
+	//		//woMyself->PlayAnimation(animSet->wID, animSet->wStance, 10.0, false);
+	//		// Increment the Iterator to point to next entry
+	//		it++;
+	//	}
+	//}
+	// XXX; for debug
+	//return;
+	if (woMyself){
 		float fRunSpeed = 1.0f;
 		float fSpeedScale = 1.0f;
 		float fForwardSpeed = 1.0f;
@@ -517,13 +533,57 @@ void cInterface::UpdatePlayerMoveState() {
 		m_Network->SendMoveUpdate(iFB, iStrafe, iTurn, !m_MotionControlsState.walk);
 
 		m_World->Lock();
+		woMyself->Lock();
 		woMyself->SetMoveVelocities(iFB*fForwardSpeed, iStrafe*fSidestepSpeed, iTurn*1.5f);
+
+		
+		// TODO: scale running/walking speeds with movement speed
+		float animSpeed = 1.0 * fSpeedScale;
+
+		// update animation
+		// XXX: TODO: don't reset animation if it's already playing
+		if (iFB == 0 && iTurn == 0 && iStrafe == 0){
+			woMyself->PlayAnimation(Animation::MotionCommand::Ready, woMyself->GetStance(), 1.0, true);
+		}
+		else {
+			if (iFB > 0) {
+				if (m_MotionControlsState.walk) {
+					woMyself->PlayAnimation(Animation::MotionCommand::WalkForward, woMyself->GetStance(), animSpeed, true);
+				}
+				else {
+					woMyself->ClearDefaultAnimations();
+					woMyself->PlayAnimation(Animation::MotionCommand::RunForward, woMyself->GetStance(), animSpeed * fRunSpeed * 0.5, false);
+					// XXX: there isn't a hold run animation set. so we force the raw animation ID here. There must be a better way?
+					woMyself->SetDefaultAnimation(static_cast<DWORD>(Animation::ID::HumanRunning), animSpeed * fRunSpeed * 0.5 * 30.0);
+				}
+			}
+			else if (iFB < 0) {
+				woMyself->PlayAnimation(Animation::MotionCommand::WalkForward, woMyself->GetStance(), -animSpeed, false);
+				// XXX: do we need to do this or can we just sticky the WalkForward animation set?
+				woMyself->SetDefaultAnimation(Animation::MotionCommand::WalkForward, woMyself->GetStance(), -animSpeed);
+			}
+			else if (iTurn < 0) {
+				woMyself->PlayAnimation(Animation::MotionCommand::TurnRight, woMyself->GetStance(), -animSpeed, true);
+			}
+			else if (iTurn > 0) {
+				woMyself->PlayAnimation(Animation::MotionCommand::TurnRight, woMyself->GetStance(), animSpeed, true);
+			}
+			else if (iStrafe < 0) {
+				woMyself->PlayAnimation(Animation::MotionCommand::SideStepRight, woMyself->GetStance(), -animSpeed, true);
+			}
+			else if (iStrafe > 0) {
+				woMyself->PlayAnimation(Animation::MotionCommand::SideStepRight, woMyself->GetStance(), animSpeed, true);
+			}
+		}
+
+
 		// process movement to update Location (not the same as Position -- Location is shared /w server!)
 		//XXX: stLocation *lPlayer = woMyself->GetLocation();
 		//XXX: stMoveInfo mPlayer = woMyself->GetMoveInfo();
 		//XXX: float fPlayerHeading = woMyself->GetHeading();
 		//XXX: lPlayer->Origin.x -= -sin(fPlayerHeading);
 		//XXX: lPlayer->Origin.y += -cos(fPlayerHeading);
+		woMyself->Unlock();
 		m_World->Unlock();
 	}
 }
@@ -978,7 +1038,7 @@ bool cInterface::OnMouseDown( IWindow & Window, float X, float Y, unsigned long 
 				}
 				m_stCharList[i]->SetTextColor(0x0000FF);
 				m_mgChars[i]->SetDefaultAnim(0);
-				m_mgChars[i]->PlayAnimation( 0x03000853, 0, 0xFFFFFFFF, 30.0f );
+				m_mgChars[i]->PlayAnimation(static_cast<DWORD>(Animation::ID::HumanKneel), 0, 0xFFFFFFFF, 30.0f );
 			}
 		}
 
@@ -1275,8 +1335,10 @@ bool cInterface::OnKeyDown( IWindow & Window, unsigned long KeyCode )
 		if (m_InterfaceMode == eMOTD)
 		{
 			dwAnim--;
-			for (int i=0;i<m_CharList.CharCount;i++)
-				m_mgChars[i]->PlayAnimation(dwAnim, 0, 0xFFFFFFFE, 30.0f),OutputConsoleString( "Playing animation %08x...", dwAnim );
+			for (int i = 0; i < m_CharList.CharCount; i++) {
+				m_mgChars[i]->PlayAnimation(dwAnim, 0, 0xFFFFFFFE, 30.0f);
+				OutputConsoleString("Playing animation %08x...", dwAnim);
+			}
 		}
 		m_fCamRotX -= (float) M_PI/20;
 	}
@@ -1640,7 +1702,7 @@ bool cInterface::OnRender( IWindow & Window, double TimeSlice )
 				m_mgChars[i]->SetRotation(0, 0, 0, 0);
 				m_mgChars[i]->SetTranslation(cPoint3D(2.0f-i, 0, 0));
 				m_mgChars[i]->SetScale(1.0f);
-				m_mgChars[i]->SetDefaultAnim(0x03000002);
+				m_mgChars[i]->SetDefaultAnim(static_cast<DWORD>(Animation::ID::HumanRunning));
 				m_mgChars[i]->UpdateAnim((float) rand()/RAND_MAX);
 			}
 
@@ -1651,7 +1713,7 @@ bool cInterface::OnRender( IWindow & Window, double TimeSlice )
 			}
 			m_stCharList[0]->SetTextColor(0x0000FF);
 			m_mgChars[0]->SetDefaultAnim(0);
-			m_mgChars[0]->PlayAnimation( 0x03000853, 0, 0xFFFFFFFF, 30.0f );
+			m_mgChars[0]->PlayAnimation(static_cast<DWORD>(Animation::ID::HumanKneel), 0, 0xFFFFFFFF, 30.0f );
 
 			for (int i=0;i<5;i++)
 			{
@@ -1835,11 +1897,6 @@ DWORD cInterface::GetCurrentSelection()
 {
 	return m_dwCurSelect;
 }
-
-//void cInterface::SetStance(WORD NewStance)
-//{
-//	m_wStance = NewStance;
-//}
 
 bool cInterface::OnClick( IWindow & Window, float X, float Y, unsigned long Button )
 {

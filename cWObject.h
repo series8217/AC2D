@@ -4,8 +4,19 @@
 #include "cPoint3D.h"
 #include "cThread.h"
 #include "cModelGroup.h"
+#include "AnimationIds.h"
 
 class cWorld;
+
+namespace MovementType {
+	enum MovementTypeEnum {
+		InterpretedMotionState = 0x00,
+		MoveToObject = 0x06,
+		MoveToPosition = 0x07,
+		TurnToObject = 0x08,
+		TurnToPosition = 0x09,
+	};
+}
 
 class cWObject : public cLockable {
 public:
@@ -21,7 +32,13 @@ public:
 	void Set22D(DWORD Type, DWORD Value);
 
 	void UpdatePosition(float fTimeDiff);
-	void PlayAnimation(WORD wAnim, WORD wStance, float fPlaySpeed, bool bSetDefault);
+	void ClearDefaultAnimations();
+	// by stance and ID
+	void PlayAnimation(Animation::MotionCommand Motion, Animation::Stance Stance, float fSpeedScale, bool sticky=false);
+	void SetDefaultAnimation(Animation::MotionCommand Motion, Animation::Stance Stance, float fSpeedScale);
+	// directly by animation ID in portal.dat
+	void PlayAnimation(DWORD dwAnimID, float fPlaySpeed, bool bSetDefault);
+	void SetDefaultAnimation(DWORD dwAnimID, float fDefaultPlaySpeed);
 
 	void CalcHeading();
 
@@ -37,7 +54,7 @@ public:
 	DWORD GetWielder();
 	DWORD GetObjectFlags2();
 	DWORD GetRadarOverride();
-	WORD GetStance();
+	Animation::Stance GetStance();
 	
 	void SetVelocity(cPoint3D NewVelocity);
 	void SetMoveVelocities(float fFB, float fStrafe, float fTurn);
@@ -61,6 +78,8 @@ public:
 		return animCount;
 	}
 
+	std::map<DWORD, stAnimSet> m_mAnims;
+
 private:
 	void LoadAnimset();
 	void LoadLocationHeading(float fZ);
@@ -76,33 +95,13 @@ private:
 	cPoint3D Velocity;
 	float fVelocityTurn, fVelocityStrafe, fVelocityFB;
 
-	WORD m_wStance;
+	Animation::Stance m_Stance;
 
 	bool m_bModelUpdate;
 
 	cModelGroup *m_mgModel;
 
 	stLocation location;
-
-	struct stAnimInfo {
-		DWORD dwAnim;
-		DWORD dwStartFrame;
-		DWORD dwEndFrame;
-		float fPlaySpeed;
-	};
-
-	struct stAnimSet {
-		union {
-			DWORD dwID;
-			struct {
-				WORD wID;
-				WORD wStance;
-			};
-		};
-		DWORD dwFlags;
-		std::vector<stAnimInfo> vAnims;
-	};
-	std::map<DWORD, stAnimSet> m_mAnims;
 
 	std::vector<stPaletteSwap> palettes;
 	std::vector<stTextureSwap> textures;
