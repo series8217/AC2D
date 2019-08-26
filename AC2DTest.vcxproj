@@ -293,6 +293,7 @@
   <ItemGroup>
     <ClInclude Include="AC2DTest.h" />
     <ClInclude Include="AFrame.h" />
+    <ClInclude Include="AnimationIds.h" />
     <ClInclude Include="BSPTypes.h" />
     <ClInclude Include="cByteStream.h" />
     <ClInclude Include="cCellManager.h" />
