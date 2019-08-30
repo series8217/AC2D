@@ -14,7 +14,6 @@ typedef unsigned __int64 QWORD;
 // Uncomment to disable network and allow exploration mode only
 //#define TerrainOnly
 
-
 #define WIN32_LEAN_AND_MEAN		// Exclude rarely-used stuff from Windows headers
 // Windows Header Files:
 //#include "malloc.h"
@@ -156,6 +155,7 @@ const BYTE cColor[][3] = {
 	{ 0x00, 0x00, 0xFF },		//11 - eBlue*/
 };
 
+// TODO: replace with Vector3 throughout the code
 struct Origin {
     float x, y, z;
 };

@@ -123,6 +123,9 @@
     <ClCompile Include="LandDefs.cpp">
       <Filter>Physics</Filter>
     </ClCompile>
+    <ClCompile Include="MotionTable.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AC2DTest.h">
@@ -336,6 +339,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="AnimationIds.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MotionTable.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

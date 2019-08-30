@@ -136,10 +136,10 @@ void cWObject::UpdatePosition(float fTimeDiff)
 
 		if (FirstSet)
 		{
-			if (m_mAnims.find(0x003D0003) != m_mAnims.end())
+			if (MotionTable_.Cycles.find(0x003D0003) != MotionTable_.Cycles.end())
 			{
-				stAnimSet asTemp = m_mAnims[0x003D0003];	//idle anim?
-				m_mgModel->SetDefaultAnim(asTemp.vAnims[0].dwAnim);
+				MotionData asTemp = MotionTable_.Cycles[0x003D0003];	//idle anim?
+				m_mgModel->SetDefaultAnim(asTemp.Anims[0].AnimId);
 			}
 		}
 
@@ -163,12 +163,14 @@ void cWObject::PlayAnimation(Animation::MotionCommand Motion, Animation::Stance 
 	if (!m_mgModel)
 		return;
 
-	WORD wStance = static_cast<WORD>(Stance);
-	WORD wAnim = static_cast<WORD>(Motion);
+	DWORD stance = static_cast<DWORD>(Stance);
+	DWORD anim = static_cast<DWORD>(Motion);
 
-	if (m_mAnims.find(((DWORD) wStance << 16) | wAnim) != m_mAnims.end())
+	DWORD motionLookup = (stance << 16) | (anim & 0xFFFFFF);
+
+	if (MotionTable_.Cycles.find(motionLookup) != MotionTable_.Cycles.end())
 	{
-		stAnimSet *asTemp = &m_mAnims[((DWORD) wStance << 16) | wAnim];
+		MotionData *asTemp = &MotionTable_.Cycles[motionLookup];
 		m_mgModel->PlayAnimation(asTemp, fSpeedScale, sticky);
 	}
 }
@@ -180,37 +182,39 @@ void cWObject::SetDefaultAnimation(Animation::MotionCommand Motion, Animation::S
 	if (!m_mgModel)
 		return;
 
-	WORD wStance = static_cast<WORD>(Stance);
-	WORD wAnim = static_cast<WORD>(Motion);
+	DWORD stance = static_cast<DWORD>(Stance);
+	DWORD anim = static_cast<DWORD>(Motion);
 
-	if (m_mAnims.find(((DWORD)wStance << 16) | wAnim) != m_mAnims.end())
+	DWORD motionLookup = (stance << 16) | (anim & 0xFFFFFF);
+
+	if (MotionTable_.Cycles.find(motionLookup) != MotionTable_.Cycles.end())
 	{
-		stAnimSet *asTemp = &m_mAnims[((DWORD)wStance << 16) | wAnim];
+		MotionData *asTemp = &MotionTable_.Cycles[motionLookup];
 		m_mgModel->SetDefaultAnim(asTemp, fSpeedScale);
 	}
 }
 
 // Play animation directly by ID in portal dat file
-void cWObject::PlayAnimation(DWORD dwAnimID, float fPlaySpeed, bool bSetDefault)
+void cWObject::PlayAnimation(DWORD AnimIdID, float fPlaySpeed, bool bSetDefault)
 {
 	//fix this to cache...
 	if (!m_mgModel)
 		return;
 
 	if (bSetDefault) {
-		m_mgModel->SetDefaultAnim(dwAnimID, fPlaySpeed);
+		m_mgModel->SetDefaultAnim(AnimIdID, fPlaySpeed);
 	}
-	m_mgModel->PlayAnimation(dwAnimID, 0, 0xFFFFFFFF, fPlaySpeed);
+	m_mgModel->PlayAnimation(AnimIdID, 0, 0xFFFFFFFF, fPlaySpeed);
 }
 
 // Set default animation directly by ID in portal dat file
-void cWObject::SetDefaultAnimation(DWORD dwAnimID, float fDefaultPlaySpeed)
+void cWObject::SetDefaultAnimation(DWORD AnimIdID, float fDefaultPlaySpeed)
 {
 	//fix this to cache...
 	if (!m_mgModel)
 		return;
 
-	m_mgModel->SetDefaultAnim(dwAnimID, fDefaultPlaySpeed);
+	m_mgModel->SetDefaultAnim(AnimIdID, fDefaultPlaySpeed);
 }
 
 void cWObject::ParseMessageMotion(cMessage * Message)
@@ -255,12 +259,12 @@ void cWObject::ParseMessageMotion(cMessage * Message)
 				// movement command
 				//hold animation until stopped
 				//holding out hand does this
-				Motion = Animation::MotionFromID(Message->ReadWORD());
+				Motion = Animation::MotionCommandFromID(Message->ReadWORD());
 			}
 			if (flags & 0x8)
 			{
 				// sidestep command
-				Motion = Animation::MotionFromID(Message->ReadWORD());
+				Motion = Animation::MotionCommandFromID(Message->ReadWORD());
 				m_bMoving = true;
 			}
 			else
@@ -269,7 +273,7 @@ void cWObject::ParseMessageMotion(cMessage * Message)
 			if (flags & 0x20)
 			{
 				// turn command
-				Motion = Animation::MotionFromID(Message->ReadWORD());
+				Motion = Animation::MotionCommandFromID(Message->ReadWORD());
 				m_bMoving = true;
 			}
 			else
@@ -304,7 +308,7 @@ void cWObject::ParseMessageMotion(cMessage * Message)
 			if (flags & 0x80)
 			{
 				//anim sequence?
-				Motion = Animation::MotionFromID(Message->ReadWORD());
+				Motion = Animation::MotionCommandFromID(Message->ReadWORD());
 				WORD animSequence = Message->ReadWORD();
 				fSpeed = Message->ReadFloat();
 				bSetDefault = false;
@@ -513,8 +517,7 @@ void cWObject::ParseMessageObjectCreate(cMessage * Message)
 	{
 		animConfig = Message->ReadDWORD();
 		
-		//parse animset!
-		LoadAnimset();
+		LoadMotionTable();
 	}
 	if (flags & 0x00000800)
 	{
@@ -990,7 +993,7 @@ void cWObject::SetVelocity(cPoint3D NewVelocity)
 }
 
 
-void cWObject::LoadAnimset()
+void cWObject::LoadMotionTable()
 {
 	cPortalFile *pf = m_Portal->OpenEntry(animConfig);
 	if (!pf)
@@ -999,131 +1002,7 @@ void cWObject::LoadAnimset()
 	cByteStream BS(pf->data, pf->length);
 	BS.ReadBegin();
 
-	//portal ID
-	DWORD dwID = BS.ReadDWORD();
-
-	//something that tends to always be 0x8000003D
-	DWORD dwUnknown = BS.ReadDWORD();
-
-	//first vector, pairs together different 0x800000**'s to 0x41000003?
-	DWORD vec1count = BS.ReadDWORD();
-	for (DWORD i=0; i<vec1count; i++)
-	{
-		DWORD unk1 = BS.ReadDWORD();
-		DWORD unk2 = BS.ReadDWORD();
-	}
-
-    FILE *out = NULL;
-	//FILE *out=fopen("aset.txt","wt");
-
-	DWORD vec2count = BS.ReadDWORD();
-	for (DWORD i=0; i<vec2count; i++)
-	{
-		//0x003D0141 ?? obj[0];
-		stAnimSet asTemp;
-		asTemp.dwID = BS.ReadDWORD();
-        asTemp.dwFlags = BS.ReadDWORD();
-
-		stAnimInfo aiTemp;
-		aiTemp.dwAnim = BS.ReadDWORD(); //0x0300****
-		aiTemp.dwStartFrame = BS.ReadDWORD(); //0x00000000
-		aiTemp.dwEndFrame = BS.ReadDWORD(); //0xFFFFFFFF
-		aiTemp.fPlaySpeed = BS.ReadFloat();
-
-        if (out != NULL) {
-            fprintf(out, "%08X (%08X): %08X\n", asTemp.dwID, asTemp.dwFlags, aiTemp.dwAnim);
-        }
-
-		if (aiTemp.fPlaySpeed == 0)
-			aiTemp.fPlaySpeed = 30.0f;
-
-		asTemp.vAnims.push_back(aiTemp);
-		
-		m_mAnims[asTemp.dwID] = asTemp;
-
-		if (asTemp.dwFlags & 0x20000) {
-			//3 floats? are here
-			BS.ReadFloat();
-			BS.ReadFloat();
-			BS.ReadFloat();
-		}
-	}
-
-	DWORD vec3count = BS.ReadDWORD();
-	for (DWORD i=0; i<vec3count; i++)
-	{
-		//first word(low) is weird (0x0D, 0x0F, etc.)
-		//second word(high) is animation stance?
-		WORD stance = (WORD)(BS.ReadDWORD() >> 16);
-
-		//probably not flags, probably 2 WORDS (high is usually 2, sometimes 1)
-		DWORD flags = BS.ReadDWORD();
-
-		//last 3 are floats? could be dependent on flags, who knows..
-		BS.ReadFloat();
-		BS.ReadFloat();
-		BS.ReadFloat();
-	}
-
-	DWORD vec4count = BS.ReadDWORD();
-	for (DWORD i=0; i<vec4count; i++)
-	{
-		//0x003D0141 ?? obj[0]
-		WORD wUnk = BS.ReadWORD();
-		WORD wStance = BS.ReadWORD();
-
-        if (out != NULL) {
-            fprintf(out, "%04X (%04X): \n", wStance, wUnk);
-        }
-
-		DWORD vec5count = BS.ReadDWORD();
-		for (DWORD h=0; h<vec5count; h++)
-		{
-			stAnimSet asTemp;
-			asTemp.dwID = BS.ReadWORD();
-			asTemp.dwFlags = BS.ReadWORD();
-
-            if (out != NULL) {
-                fprintf(out, "  %04X (%04X):: ", asTemp.dwID, asTemp.dwFlags);
-            }
-
-			DWORD vec6count = BS.ReadDWORD();
-			for (DWORD vec6it = 0; vec6it < vec6count; vec6it++)
-			{
-				stAnimInfo aiTemp;
-				aiTemp.dwAnim = BS.ReadDWORD(); //0x0300****
-				aiTemp.dwStartFrame = BS.ReadDWORD(); //0x00000000
-				aiTemp.dwEndFrame = BS.ReadDWORD(); //0xFFFFFFFF
-				aiTemp.fPlaySpeed = BS.ReadFloat();
-
-                if (out != NULL)
-                {
-                    fprintf(out, "%08X ", aiTemp.dwAnim);
-                }
-
-				//?
-				if (aiTemp.fPlaySpeed == 0)
-					aiTemp.fPlaySpeed = 30.0f;
-
-				asTemp.vAnims.push_back(aiTemp);
-			}
-
-            if (out != NULL) {
-                fprintf(out, "\n");
-            }
-
-			//uhh, ick...
-			if ((wUnk == 0) || (wUnk == 3))
-				asTemp.dwID |= ((DWORD) wStance << 16);
-			else
-				asTemp.dwID |= ((DWORD) wUnk << 16);
-
-			m_mAnims[asTemp.dwID] = asTemp;
-		}
-	}
-    if (out != NULL) {
-        fclose(out);
-    }
+	MotionTable_.Unpack(&BS);
 }
 
 Animation::Stance cWObject::GetStance()

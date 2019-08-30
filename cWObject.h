@@ -37,8 +37,8 @@ public:
 	void PlayAnimation(Animation::MotionCommand Motion, Animation::Stance Stance, float fSpeedScale, bool sticky=false);
 	void SetDefaultAnimation(Animation::MotionCommand Motion, Animation::Stance Stance, float fSpeedScale);
 	// directly by animation ID in portal.dat
-	void PlayAnimation(DWORD dwAnimID, float fPlaySpeed, bool bSetDefault);
-	void SetDefaultAnimation(DWORD dwAnimID, float fDefaultPlaySpeed);
+	void PlayAnimation(DWORD AnimIdID, float fPlaySpeed, bool bSetDefault);
+	void SetDefaultAnimation(DWORD AnimIdID, float fDefaultPlaySpeed);
 
 	void CalcHeading();
 
@@ -78,10 +78,10 @@ public:
 		return animCount;
 	}
 
-	std::map<DWORD, stAnimSet> m_mAnims;
+	MotionTable MotionTable_;
 
 private:
-	void LoadAnimset();
+	void LoadMotionTable();
 	void LoadLocationHeading(float fZ);
 
     cWorld* m_World;

@@ -41,11 +41,11 @@ void cByteStream::ReadBegin( void )
 // Align to next DWORD boundary?
 void cByteStream::ReadAlign( void )
 {
-	int iOffset = (int) (m_pbDataPtr - m_pbDataStart);
-	if ( (iOffset & 3) != 0)
-		m_pbDataPtr += (4 - (iOffset & 3));
-//	if ( (iOffset % 4) != 0)
-//		m_pbDataPtr += (4 - (iOffset % 4));
+	long iOffset = m_pbDataPtr - m_pbDataStart;
+	long alignDelta = iOffset % 4;
+	if (alignDelta != 0) {
+		m_pbDataPtr += (int)(4 - alignDelta);
+	}
 }
 
 void cByteStream::ReadSkip(int iAmount)

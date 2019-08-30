@@ -1991,6 +1991,8 @@ void cNetwork::ProcessMessage(cMessage *Msg, stServerInfo *Server)
 		DWORD turbineChatEnabled = Msg->ReadDWORD();	//0x00010000
 		DWORD unknown3 = Msg->ReadDWORD();				//0x00010000
 
+		// clear the connection timeout since we made it to the character select screen
+		m_dwNextConnectionTimeout = 0;
 
 		m_Interface->SetCharList(&CharList);
 		m_Interface->SetInterfaceMode(eMOTD);

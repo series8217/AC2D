@@ -273,6 +273,7 @@
     <ClCompile Include="cWorld.cpp" />
     <ClCompile Include="Landblocks.cpp" />
     <ClCompile Include="LandDefs.cpp" />
+    <ClCompile Include="MotionTable.cpp" />
     <ClCompile Include="stdafx.cpp">
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Disabled</Optimization>
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Disabled</Optimization>
@@ -311,6 +312,7 @@
     <ClInclude Include="cPhysics.h" />
     <ClInclude Include="cPoint3D.h" />
     <ClInclude Include="LandDefs.h" />
+    <ClInclude Include="MotionTable.h" />
     <ClInclude Include="Polygon.h" />
     <ClInclude Include="cPortal.h" />
     <ClInclude Include="cThread.h" />

@@ -4,7 +4,7 @@
 #include "Skill.h"
 #include "AnimationIds.h"
 
-DWORD dwAnim = static_cast<DWORD>(Animation::ID::HumanWaveArm);
+DWORD AnimId = static_cast<DWORD>(Animation::ID::HumanWaveArm);
 DWORD dwTexBase = 0x06000000;
 
 cInterface::cInterface()
@@ -473,21 +473,7 @@ int cInterface::Draw(RECT rRect, HDC hDC)
 void cInterface::UpdatePlayerMoveState() {
 	//Update velocity info
 	cWObject *woMyself = m_World->FindObject(m_dwSelChar);
-	//if (woMyself && m_MotionControlsState.forward) {
-	//	static auto it = woMyself->m_mAnims.begin();
-	//	while (it != woMyself->m_mAnims.end())
-	//	{
-	//		// Accessing KEY from element pointed by it.
-	//		cWObject::stAnimSet* animSet= &it->second;
-	//
-	//		OutputConsoleString("Stance=%04x, Index=%04x, AnimID[0]=%08x...", animSet->wStance, animSet->wID, animSet->vAnims[0].dwAnim);
-	//		//woMyself->PlayAnimation(animSet->wID, animSet->wStance, 10.0, false);
-	//		// Increment the Iterator to point to next entry
-	//		it++;
-	//	}
-	//}
-	// XXX; for debug
-	//return;
+
 	if (woMyself){
 		float fRunSpeed = 1.0f;
 		float fSpeedScale = 1.0f;
@@ -502,7 +488,6 @@ void cInterface::UpdatePlayerMoveState() {
 		if (m_MotionControlsState.walk) {
 			fRunSpeed = 1.0f;
 		}
-
 
 		int iFB = 0, iStrafe = 0, iTurn = 0;
 
@@ -1153,6 +1138,10 @@ bool cInterface::OnMouseUp( IWindow & Window, float X, float Y, unsigned long Bu
 
 bool cInterface::OnKeyUp( IWindow & Window, unsigned long KeyCode )
 {
+	if (KeyCode == VK_SHIFT) {
+		m_MotionControlsState.walk = false;
+		bMotionUpdate = true;
+	}
 	if (KeyCode == 'W')
 	{
         m_MotionControlsState.forward = false;
@@ -1255,6 +1244,12 @@ bool cInterface::OnKeyDown( IWindow & Window, unsigned long KeyCode )
 //	{
 //		m_Network->CastSpell(m_dwCurSelect, 27);
 //	}
+	if (KeyCode == VK_SHIFT) {
+		if (!m_MotionControlsState.walk) {
+			m_MotionControlsState.walk = true;
+			bMotionUpdate = true;
+		}
+	}
 
 	if (KeyCode == 'W')
 	{
@@ -1334,10 +1329,10 @@ bool cInterface::OnKeyDown( IWindow & Window, unsigned long KeyCode )
 		}
 		if (m_InterfaceMode == eMOTD)
 		{
-			dwAnim--;
+			AnimId--;
 			for (int i = 0; i < m_CharList.CharCount; i++) {
-				m_mgChars[i]->PlayAnimation(dwAnim, 0, 0xFFFFFFFE, 30.0f);
-				OutputConsoleString("Playing animation %08x...", dwAnim);
+				m_mgChars[i]->PlayAnimation(AnimId, 0, 0xFFFFFFFE, 30.0f);
+				OutputConsoleString("Playing animation %08x...", AnimId);
 			}
 		}
 		m_fCamRotX -= (float) M_PI/20;
@@ -1355,9 +1350,9 @@ bool cInterface::OnKeyDown( IWindow & Window, unsigned long KeyCode )
 		}
 		if (m_InterfaceMode == eMOTD)
 		{
-			dwAnim++;
+			AnimId++;
 			for (int i=0;i<m_CharList.CharCount;i++)
-				m_mgChars[i]->PlayAnimation(dwAnim, 0, 0xFFFFFFFE, 30.0f),OutputConsoleString( "Playing animation %08x...", dwAnim );
+				m_mgChars[i]->PlayAnimation(AnimId, 0, 0xFFFFFFFE, 30.0f),OutputConsoleString( "Playing animation %08x...", AnimId );
 		}
 		m_fCamRotX += (float) M_PI/20;
 	}

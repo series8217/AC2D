@@ -2,6 +2,7 @@
 #include "cModelGroup.h"
 #include "cByteStream.h"
 #include "AnimationIds.h"
+#include "MotionTable.h"
 
 #include "BSPTypes.h"
 
@@ -14,14 +15,15 @@ cModelGroup::cModelGroup()
 	m_fAnimT;
 	m_pfAnim = 0;
 	m_fKeyData = NULL;
-	m_AnimSet = NULL;
-	m_DefaultAnimSet = NULL;
-	m_fDefaultAnimSetSpeedScale = 1.0;
-	m_AnimSetCurIndex = -1;
+	m_MotionData = NULL;
+	m_DefaultMotionData = NULL;
+	m_fDefaultMotionDataSpeedScale = 1.0;
+	m_MotionDataCurIndex = -1;
 	m_dwDefaultAnim = 0;
 	m_dwCurAnim = 0;
-	m_dwEndFrame = 0;
+	m_HighFrame = 0;
 	m_fDefaultPlaySpeed = 30.0;
+	m_bReverse = false;
 }
 
 cModelGroup::~cModelGroup()
@@ -34,52 +36,58 @@ cModelGroup::~cModelGroup()
 
 void cModelGroup::ClearDefaultAnimations() {
 	m_dwDefaultAnim = 0;
-	m_DefaultAnimSet = NULL;
+	m_DefaultMotionData = NULL;
 }
 
-void cModelGroup::SetDefaultAnim(DWORD dwAnim, float fDefaultPlaySpeed)
+void cModelGroup::SetDefaultAnim(DWORD AnimId, float fDefaultPlaySpeed)
 {
-	m_dwDefaultAnim = dwAnim;
+	m_dwDefaultAnim = AnimId;
 	//if (!m_dwCurAnim)
 	//	m_dwCurAnim = m_dwDefaultAnim;
 	m_fDefaultPlaySpeed = fDefaultPlaySpeed;
 }
 
-void cModelGroup::SetDefaultAnim(stAnimSet* AnimSet, float fSpeedScale)
+void cModelGroup::SetDefaultAnim(MotionData* MotionData, float fSpeedScale)
 {
-	m_DefaultAnimSet = AnimSet;
-	m_fDefaultAnimSetSpeedScale = fSpeedScale;
+	m_DefaultMotionData = MotionData;
+	m_fDefaultMotionDataSpeedScale = fSpeedScale;
 	//if (!m_dwCurAnim)
 	//	m_dwCurAnim = m_dwDefaultAnim;
 	
 }
 
-void cModelGroup::PlayAnimation(stAnimSet* AnimSet, float PlaySpeed, bool sticky)
+void cModelGroup::PlayAnimation(MotionData* MotionData, float PlaySpeed, bool sticky)
 {
-	m_AnimSet = AnimSet;
-	m_AnimSetCurIndex = 0;
-	m_fAnimSetSpeedScale = PlaySpeed;
-	m_bAnimSetSticky = sticky;
-	PlayAnimation(&m_AnimSet->vAnims[m_AnimSetCurIndex], PlaySpeed);
+	m_MotionData = MotionData;
+	m_MotionDataCurIndex = 0;
+	m_fMotionDataSpeedScale = PlaySpeed;
+	m_bMotionDataSticky = sticky;
+	PlayAnimation(&m_MotionData->Anims[m_MotionDataCurIndex], PlaySpeed);
 }
 
-void cModelGroup::PlayAnimation(stAnimInfo* AnimInfo, float SpeedScale){
-	PlayAnimation(AnimInfo->dwAnim, AnimInfo->dwStartFrame, AnimInfo->dwEndFrame, AnimInfo->fPlaySpeed * SpeedScale);
+void cModelGroup::PlayAnimation(AnimData* AnimInfo, float SpeedScale){
+	PlayAnimation(AnimInfo->AnimId, AnimInfo->LowFrame, AnimInfo->HighFrame, AnimInfo->AnimFramerate * SpeedScale);
 }
 
-void cModelGroup::PlayAnimation(DWORD dwAnim, DWORD dwStartFrame, DWORD dwEndFrame, float fPlaySpeed)
+void cModelGroup::PlayAnimation(DWORD AnimId, DWORD LowFrame, DWORD HighFrame, float fPlaySpeed)
 {
-	// XXX: TODO: get negative play speed working properly.
-	m_fAnimT = dwStartFrame/fPlaySpeed;
+	if (fPlaySpeed < 0) {
+		fPlaySpeed = -1.0f*fPlaySpeed;
+		m_bReverse = true;
+	}
+	else {
+		m_bReverse = false;
+	}
+	m_fAnimT = LowFrame/fPlaySpeed;
 	m_fPlaySpeed = fPlaySpeed;
-	m_dwEndFrame = dwEndFrame;
-	m_dwCurAnim = dwAnim;
+	m_HighFrame = HighFrame;
+	m_dwCurAnim = AnimId;
 
 	delete []m_fKeyData;
 	m_fKeyData = NULL;
 
 	//now, load animation data
-	m_pfAnim = m_Portal->OpenEntry(Animation::BaseID | dwAnim);
+	m_pfAnim = m_Portal->OpenEntry(Animation::BaseID | AnimId);
 	if (!m_pfAnim)
 		return;
 
@@ -102,8 +110,8 @@ void cModelGroup::PlayAnimation(DWORD dwAnim, DWORD dwStartFrame, DWORD dwEndFra
 	ZeroMemory(m_fKeyData, num_frames*num_parts*7*sizeof(float));
 	m_iNumFrames = num_frames;
 	m_iNumParts = num_parts;
-	if (dwEndFrame == 0xFFFFFFFF)
-		m_dwEndFrame = m_iNumFrames;
+	if (HighFrame == 0xFFFFFFFF)
+		m_HighFrame = m_iNumFrames;
 
 	//Index frame data
 	skip=16;
@@ -145,6 +153,39 @@ void cModelGroup::PlayAnimation(DWORD dwAnim, DWORD dwStartFrame, DWORD dwEndFra
 	}
 }
 
+// advance to the next animation in the set, or repeat last animation if sticky
+void cModelGroup::MotionDataNext(){
+	if (!m_MotionData){
+		return;
+	}
+
+	if (m_bReverse){
+		m_MotionDataCurIndex--;
+	} else {
+		m_MotionDataCurIndex++;
+	}
+
+	if (m_MotionDataCurIndex >= 0 && m_MotionDataCurIndex < m_MotionData->Anims.size()){
+		PlayAnimation(&m_MotionData->Anims[m_MotionDataCurIndex], m_fMotionDataSpeedScale);
+	}
+
+	else {
+		// no more animations left in set
+		if (m_bMotionDataSticky){
+			if (m_bReverse){
+				m_MotionDataCurIndex++;
+			} else {
+				m_MotionDataCurIndex--;
+			}
+			PlayAnimation(&m_MotionData->Anims[m_MotionDataCurIndex], m_fMotionDataSpeedScale);
+		} else {
+			m_MotionData = NULL;
+			m_fMotionDataSpeedScale = 1.0;
+			m_MotionDataCurIndex = -1;
+		}
+	}
+}
+
 void cModelGroup::UpdateAnim(float fTime)
 {
 	if (!m_dwCurAnim) {
@@ -159,34 +200,17 @@ void cModelGroup::UpdateAnim(float fTime)
 	m_fAnimT += fTime;
 	DWORD iFrameNum = (int)(m_fPlaySpeed*m_fAnimT);
 
-	if ((!m_fKeyData) || ((iFrameNum >= m_dwEndFrame) && (m_dwCurAnim != m_dwDefaultAnim)))
+	if ((!m_fKeyData) || ((iFrameNum >= m_HighFrame) && (m_dwCurAnim != m_dwDefaultAnim)))
 	{
-		// currently in an animation set
-		if (m_AnimSet) {
-			m_AnimSetCurIndex++;
-			if (m_AnimSetCurIndex < m_AnimSet->vAnims.size()){
-				// play next animation
-				PlayAnimation(&m_AnimSet->vAnims[m_AnimSetCurIndex], m_fAnimSetSpeedScale);
-				iFrameNum = 0;
-			} else {
-				if (m_bAnimSetSticky){
-					// repeat last animation
-					m_AnimSetCurIndex = m_AnimSet->vAnims.size() - 1;
-	 				PlayAnimation(&m_AnimSet->vAnims[m_AnimSetCurIndex], m_fAnimSetSpeedScale);
-					//iFrameNum = 0;
-				} else {
-					// done with set
-					m_AnimSet = NULL;
-					m_AnimSetCurIndex = -1;
-					m_fAnimSetSpeedScale = 1.0;
-				}
-			}
-
+		if (m_MotionData){
+			MotionDataNext();
 		}
-		if (!m_AnimSet){
-			if (m_DefaultAnimSet) {
+
+		// no current set -- try the default animation set, otherwise default animation
+		if (!m_MotionData){
+			if (m_DefaultMotionData) {
 				// FIXME: this may get called excessively since m_dwCurAnim != m_dwDefaultAnim when playing default set.
-				PlayAnimation(m_DefaultAnimSet, m_fDefaultAnimSetSpeedScale);
+				PlayAnimation(m_DefaultMotionData, m_fDefaultMotionDataSpeedScale);
 				// FIXME: if only one animation in set, this will cause stuttering when playing back at high speed...
 				// XXX: this also probably breaks negative play speed animations
 				iFrameNum = 0;
@@ -205,11 +229,20 @@ void cModelGroup::UpdateAnim(float fTime)
 	}
 	iFrameNum %= m_iNumFrames;
 
+	int frameNum = 0;
+	if (m_bReverse) {
+		frameNum = m_iNumFrames - iFrameNum;
+	}
+	else {
+		frameNum = iFrameNum;
+	}
+
 	//Animate the nodes
 //	for (a=0;a<m_iNumParts;a++)
 	for (int a=0;a<(int) m_vModels.size();a++)
 	{
-		float *flt = &m_fKeyData[iFrameNum*m_iNumParts*7];
+		float *flt = &m_fKeyData[frameNum*m_iNumParts*7];
+
         // XXX: something else is probably wrong with this, because original code didn't check a < m_iNumParts and overran the array.
         if (a < m_iNumParts) {
             flt += a * 7;
